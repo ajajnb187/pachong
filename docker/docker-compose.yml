@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # MySQL数据库服务
+  mysql:
+    image: mysql:8.0
+    container_name: tourism-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: tourism_db
+      MYSQL_USER: tourism
+      MYSQL_PASSWORD: tourism123
+    ports:
+      - "23306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - tourism-net
+
+  # Hadoop单机伪分布式 - 使用环境变量配置 + 自动化启动脚本
+  hadoop:
+    image: bde2020/hadoop-base:2.0.0-hadoop2.7.4-java8
+    container_name: hadoop
+    hostname: hadoop
+    restart: always
+    ports:
+      - "50070:50070"  # NameNode HTTP (Hadoop 2.x)
+      - "50075:50075"  # DataNode HTTP
+      - "8088:8088"    # YARN ResourceManager
+      - "8020:8020"    # NameNode RPC
+      - "9000:9000"    # Hadoop IPC
+    volumes:
+      - hadoop_data:/tmp/hadoop
+      - ./hadoop-init.sh:/opt/hadoop-init.sh
+      - ./hadoop-config/core-site.xml:/opt/hadoop-2.7.4/etc/hadoop/core-site.xml
+      - ./hadoop-config/hdfs-site.xml:/opt/hadoop-2.7.4/etc/hadoop/hdfs-site.xml
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://hadoop:9000
+      - CORE_CONF_hadoop_tmp_dir=/tmp/hadoop
+      - HDFS_CONF_dfs_namenode_name_dir=file:///tmp/hadoop/dfs/name
+      - HDFS_CONF_dfs_datanode_data_dir=file:///tmp/hadoop/dfs/data
+      - HDFS_CONF_dfs_replication=1
+      - MAPRED_CONF_mapreduce_framework_name=yarn
+      - YARN_CONF_yarn_resourcemanager_hostname=hadoop
+      - YARN_CONF_yarn_nodemanager_pmem___check___enabled=false
+      - YARN_CONF_yarn_nodemanager_vmem___check___enabled=false
+      - YARN_CONF_yarn_nodemanager_aux___services=mapreduce_shuffle
+    command: bash /opt/hadoop-init.sh
+    mem_limit: 4g
+    mem_reservation: 2g
+    cpus: 2
+    networks:
+      - tourism-net
+
+  # Hive专用MySQL（元数据库）
+  hive-mysql:
+    image: mysql:5.7
+    container_name: hive-mysql
+    hostname: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_ALLOW_EMPTY_PASSWORD: no
+    ports:
+      - "3307:3306"
+    volumes:
+      - hive_mysql_data:/var/lib/mysql
+    networks:
+      - tourism-net
+
+  # Hive Server（自定义镜像，基于Hadoop2.7.4+Hive2.3.9）
+  hive-server:
+    build: .
+    container_name: hive-server
+    hostname: hive-server
+    restart: always
+    ports:
+      - "50000:10000"
+      - "9083:9083"
+    depends_on:
+      - hadoop
+      - hive-mysql
+    environment:
+      - HADOOP_HOME=/opt/hadoop-2.7.4
+      - HIVE_HOME=/opt/hive
+    volumes:
+      - ./conf/hive-site.xml:/opt/hive/conf/hive-site.xml
+      - ./hadoop-config/core-site.xml:/opt/hadoop-2.7.4/etc/hadoop/core-site.xml
+    networks:
+      - tourism-net
+
+volumes:
+  mysql-data:
+  hadoop_data:
+  hadoop_logs:
+  hive_mysql_data:
+
+networks:
+  tourism-net:
+    driver: bridge

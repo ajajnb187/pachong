@@ -1,0 +1,236 @@
+Hive SQL 是什么？先搞懂这 3 个灵魂问题
+1. 为什么要学 Hive SQL？
+Hive：是基于 Hadoop 的「数据仓库工具」，能把海量数据存成「大表格」
+SQL：结构化查询语言，用来操作表格数据（增删改查）
+Hive SQL：专门用来操作 Hive 里的大表格，语法和 Excel/MySQL 的 SQL 很像，但能处理 TB 级数据！
+2. 适合谁学？
+完全不懂编程的「数据分析小白」
+会 Excel 想进阶大数据的「职场新人」
+学过 MySQL 想拓展大数据技能的「开发新手」
+3. 先记牢 3 个核心概念
+概念	类比现实	作用
+数据库	文件夹	用来存放多个表格（如：学生库、销售库）
+表	Excel 表格	存放具体数据（如：学生表、课程表）
+字段	Excel 列标题	表格的列（如：id、姓名、成绩）
+二、数据库操作：先学会建「大文件夹」
+1. 创建数据库：新建一个大文件夹
+CREATE DATABASE IF NOT EXISTS my_db; 
+-- 拆解：
+-- CREATE DATABASE：创建数据库（类比新建文件夹）
+-- IF NOT EXISTS：如果数据库不存在才创建（避免报错）
+-- my_db：数据库名称（自己取，只能用字母数字）
+运行项目并下载源码
+sql
+2. 切换数据库：进入某个文件夹
+USE my_db; 
+-- 作用：告诉Hive接下来要操作哪个数据库里的表
+-- 类比：打开"my_db"这个文件夹，准备操作里面的表格
+运行项目并下载源码
+sql
+3. 删除数据库：删掉整个文件夹
+DROP DATABASE IF EXISTS my_db CASCADE; 
+-- 关键参数：
+-- CASCADE：强制删除（如果里面有表，必须加这个，否则会报错）
+-- 类比：删除文件夹时，连里面的文件一起删掉
+运行项目并下载源码
+sql
+三、表操作：学会创建和管理「大表格」
+1. 创建内部表：Hive 帮你管理数据（常用）
+CREATE TABLE students (
+  stu_id INT,        -- 学生ID，整数类型
+  stu_name STRING,   -- 学生姓名，字符串类型
+  age INT,           -- 年龄，整数类型
+  score DOUBLE       -- 成绩，小数类型
+) 
+ROW FORMAT DELIMITED 
+FIELDS TERMINATED BY ','  -- 字段之间用逗号分隔（如：1,张三,18,90.5）
+STORED AS TEXTFILE;       -- 数据存成文本文件（最简单的格式）
+运行项目并下载源码
+sql
+2. 创建外部表：数据存在 Hive 外面（适合共享）
+CREATE EXTERNAL TABLE external_students (
+  stu_id INT,
+  stu_name STRING
+) 
+ROW FORMAT DELIMITED 
+FIELDS TERMINATED BY '\t'  -- 字段用制表符分隔（像Excel的列间隔）
+LOCATION '/hive/external_data';  -- 数据存在HDFS的这个路径下
+运行项目并下载源码
+sql
+💡 内部表 vs 外部表：
+
+内部表：删除表时，数据和表一起删（Hive 完全管理）
+外部表：删除表时，只删表结构，数据还在（适合多人共享数据）
+3. 创建分区表：给表格分格子（查得快）
+CREATE TABLE sales (
+  order_id INT,       -- 订单号
+  amount DOUBLE       -- 金额
+) 
+PARTITIONED BY (sale_date STRING);  -- 按日期分区（如：date=202310）
+运行项目并下载源码
+sql
+💡 为什么用分区表？：比如查 2023 年 10 月的数据，直接定位到对应分区，不用扫描全表，速度快 10 倍！
+
+四、数据插入：往表格里填数据
+1. 从本地文件批量导入（常用）
+LOAD DATA LOCAL INPATH '/root/data.csv' INTO TABLE students;
+-- 拆解：
+-- LOAD DATA：加载数据
+-- LOCAL：从本地文件系统（如果不加LOCAL就是从HDFS）
+-- INPATH '/root/data.csv'：数据文件路径
+-- INTO TABLE students：导入到students表
+运行项目并下载源码
+sql
+📝 文件格式要求：
+
+第一行：必须是字段名（stu_id,stu_name,age,score）
+数据行：字段用逗号分隔（和建表时的 FIELDS TERMINATED BY 一致）
+2. 手动插入少量数据（临时用）
+INSERT INTO TABLE students VALUES (1, '张三', 18, 90.5);
+-- 作用：插入一行数据到students表
+-- VALUES后面：按字段顺序写数据（id=1，姓名=张三，年龄=18，成绩=90.5）
+运行项目并下载源码
+sql
+3. 从其他表复制数据（高级用法）
+INSERT INTO TABLE new_students 
+SELECT stu_id, stu_name, age FROM old_students;
+-- 作用：把old_students表的id、姓名、年龄复制到new_students表
+运行项目并下载源码
+sql
+五、基础查询：从表格里找数据
+1. 查所有数据：看看表格长啥样
+SELECT * FROM students; 
+-- 拆解：
+-- SELECT *：选择所有字段（*代表所有）
+-- FROM students：从students表查询
+-- 执行结果：显示表格的所有行和列
+运行项目并下载源码
+sql
+2. 查指定字段：只看需要的列
+SELECT stu_name, score FROM students; 
+-- 作用：只查询姓名和成绩两列
+-- 类比：Excel里隐藏其他列，只显示这两列
+运行项目并下载源码
+sql
+3. 条件查询：筛选符合条件的数据
+SELECT stu_name, age, score 
+FROM students 
+WHERE age > 18 AND score >= 90; 
+-- 拆解：
+-- WHERE：后面跟过滤条件（只显示满足条件的行）
+-- age > 18：年龄大于18岁
+-- AND：并且（同时满足两个条件）
+-- score >= 90：成绩大于等于90分
+运行项目并下载源码
+sql
+4. 去重查询：去掉重复数据
+SELECT DISTINCT age FROM students; 
+-- 作用：查询有多少种不同的年龄（比如结果可能是18,19,20）
+-- DISTINCT：去重（只保留不同的值）
+运行项目并下载源码
+sql
+5. 排序与分页：让数据排好队
+SELECT stu_name, score 
+FROM students 
+ORDER BY score DESC  -- 按成绩降序排列（DESC是降序，ASC是升序，默认升序）
+LIMIT 10;            -- 只显示前10条数据（分页用）
+运行项目并下载源码
+sql
+六、聚合函数：对数据做统计（必学！）
+1. 统计行数：有多少条数据
+SELECT COUNT(*) AS total_students FROM students; 
+-- 拆解：
+-- COUNT(*)：统计所有行的数量（*代表所有列）
+-- AS total_students：给结果起别名（方便看，原来的列名是COUNT(*)）
+-- 执行结果：得到一个数字，比如500（表示有500个学生）
+运行项目并下载源码
+sql
+2. 求总和与平均值：算总分、平均分
+SELECT 
+  SUM(score) AS total_score,   -- 所有成绩的总和
+  AVG(score) AS avg_score      -- 所有成绩的平均分
+FROM students;
+运行项目并下载源码
+sql
+3. 求最大值 / 最小值：谁的成绩最高？
+SELECT 
+  MAX(score) AS highest_score,  -- 最高成绩
+  MIN(score) AS lowest_score    -- 最低成绩
+FROM students;
+运行项目并下载源码
+sql
+七、分组查询：按类别统计（超重要！）
+1. 按单个字段分组：比如按年龄分组
+SELECT age, COUNT(*) AS count 
+FROM students 
+GROUP BY age; 
+-- 拆解：
+-- GROUP BY age：按年龄分组（相同年龄的人分到一组）
+-- 执行结果：显示每个年龄有多少人（如：18岁有30人，19岁有40人）
+运行项目并下载源码
+sql
+2. 按多个字段分组：比如按年龄 + 性别
+SELECT age, gender, AVG(score) AS avg_score 
+FROM students 
+GROUP BY age, gender; 
+-- 作用：分别计算每个年龄、每个性别的平均成绩
+-- 比如：18岁男生平均85分，18岁女生平均90分
+运行项目并下载源码
+sql
+3. 过滤分组结果：HAVING 子句（重点！）
+SELECT age, COUNT(*) AS count 
+FROM students 
+GROUP BY age 
+HAVING count > 50;  -- 只显示人数超过50的组
+运行项目并下载源码
+sql
+💡 WHERE vs HAVING：
+
+WHERE：过滤原始数据（分组前就排除不符合条件的行）
+HAVING：过滤分组后的结果（先分组，再排除不符合条件的组）
+八、常见错误提醒：新手必看！
+1. 字段名写错
+❌ 错误：SELECT stuname FROM students;（缺少下划线）
+✅ 正确：SELECT stu_name FROM students;（字段名要和建表时一致）
+
+2. 分区表没加分区条件（严格模式下会报错）
+-- 正确写法（必须加分区条件）：
+SELECT * FROM sales WHERE sale_date='202310'; 
+ 
+-- 错误写法（严格模式下会报错）：
+SELECT * FROM sales; （没加分区条件，Hive默认严格模式防止全表扫描）
+运行项目并下载源码
+sql
+3. HAVING 里用了字段别名（不允许！）
+❌ 错误：
+SELECT age, COUNT(*) AS count
+FROM students
+HAVING count > 50; （虽然逻辑对，但 HAVING 不能直接用别名，部分版本允许）
+
+✅ 正确（推荐写法）：
+SELECT age, COUNT() AS count
+FROM students
+HAVING COUNT() > 50; （直接用聚合函数）
+
+九、总结：3 步搞定 Hive SQL 基础
+建库建表：先创建数据库（文件夹），再创建表（表格），根据需求选内部表、外部表或分区表
+插入数据：用 LOAD DATA 批量导入本地文件，或用 INSERT 手动插入少量数据
+查询分析：
+基础查询：SELECT + FROM + WHERE
+分组统计：GROUP BY + 聚合函数（COUNT/SUM/AVG） + HAVING
+十、动手练习：马上实操 3 个小案例
+案例 1：查询成绩大于 80 分的学生姓名和成绩
+SELECT stu_name, score 
+FROM students 
+WHERE score > 80;
+运行项目并下载源码
+sql
+案例 2：按年龄分组，统计每组人数，并筛选人数超过 30 的组
+SELECT age, COUNT(*) AS num 
+FROM students 
+GROUP BY age 
+HAVING num > 30;
+运行项目并下载源码
+sql
+案例 3：计算所有学生的平均成绩
+SELECT AVG(score) AS avg_score FROM students;

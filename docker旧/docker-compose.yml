@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+  # MySQL数据库服务
+  mysql:
+    image: mysql:8.0
+    container_name: tourism-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: tourism_db
+      MYSQL_USER: tourism
+      MYSQL_PASSWORD: tourism123
+    ports:
+      - "23306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - tourism-net
+
+  # Hadoop NameNode
+  hadoop-namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    restart: always
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=tourism
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    env_file:
+      - ./hadoop/hadoop.env
+    networks:
+      - tourism-net
+
+  # Hadoop DataNode  
+  hadoop-datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    restart: always
+    ports:
+      - "9864:9864"
+      - "9866:9866"
+      - "9867:9867"
+    volumes:
+      - hadoop_datanode:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+      HDFS_CONF_dfs_datanode_hostname: "127.0.0.1"
+    env_file:
+      - ./hadoop/hadoop.env
+    networks:
+      - tourism-net
+    extra_hosts:
+      - "datanode:127.0.0.1"
+
+  # Hadoop ResourceManager
+  hadoop-resourcemanager:
+    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
+    container_name: resourcemanager
+    restart: always
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864"
+    env_file:
+      - ./hadoop/hadoop.env
+    networks:
+      - tourism-net
+
+  # Hadoop NodeManager
+  hadoop-nodemanager:
+    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
+    container_name: nodemanager
+    restart: always
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 resourcemanager:8088"
+    env_file:
+      - ./hadoop/hadoop.env
+    networks:
+      - tourism-net
+
+  # Hadoop HistoryServer
+  hadoop-historyserver:
+    image: bde2020/hadoop-historyserver:2.0.0-hadoop3.2.1-java8
+    container_name: historyserver
+    restart: always
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 resourcemanager:8088"
+    volumes:
+      - hadoop_historyserver:/hadoop/yarn/timeline
+    env_file:
+      - ./hadoop/hadoop.env
+    networks:
+      - tourism-net
+
+  # Hive Metastore PostgreSQL
+  hive-metastore-postgresql:
+    image: postgres:11
+    container_name: hive-metastore-postgresql
+    restart: always
+    environment:
+      POSTGRES_DB: metastore_db
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: hivepassword
+    ports:
+      - "5432:5432"
+    networks:
+      - tourism-net
+    volumes:
+      - hive_postgres_data:/var/lib/postgresql/data
+
+  # Hive Metastore
+  hive-metastore:
+    image: apache/hive:4.0.0
+    container_name: hive-metastore
+    restart: always
+    environment:
+      SERVICE_NAME: metastore
+      DB_DRIVER: postgres
+      SERVICE_OPTS: "-Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://hive-metastore-postgresql:5432/metastore_db -Djavax.jdo.option.ConnectionUserName=hive -Djavax.jdo.option.ConnectionPassword=hivepassword"
+    ports:
+      - "9083:9083"
+    networks:
+      - tourism-net
+    depends_on:
+      - hive-metastore-postgresql
+    volumes:
+      - type: bind
+        source: ./lib/postgresql-42.5.1.jar
+        target: /opt/hive/lib/postgres.jar
+
+  # Hive Server  
+  hive-server:
+    image: apache/hive:4.0.0
+    container_name: hive-server
+    restart: always
+    environment:
+      SERVICE_NAME: hiveserver2
+      SERVICE_OPTS: "-Dhive.metastore.uris=thrift://hive-metastore:9083"
+      IS_RESUME: "true"
+    ports:
+      - "10000:10000"
+      - "10002:10002"
+    networks:
+      - tourism-net
+    depends_on:
+      - hive-metastore
+
+volumes:
+  mysql-data:
+  hadoop_namenode:
+  hadoop_datanode:
+  hadoop_historyserver:
+  hive_postgres_data:
+
+networks:
+  tourism-net:
+    driver: bridge

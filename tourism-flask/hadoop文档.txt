@@ -1,0 +1,317 @@
+hadoop是什么？
+(1)Hadoop是一个开源的框架，可编写和运行分布式应用处理大规模数据，是专为离线和大规模数据分析而设计的，并不适合那种对几个记录随机读写的在线事务处理模式。Hadoop=HDFS（文件系统，数据存储技术相关）+ Mapreduce（数据处理），Hadoop的数据来源可以是任何形式，在处理半结构化和非结构化数据上与关系型数据库相比有更好的性能，具有更灵活的处理能力，不管任何数据形式最终会转化为key/value，key/value是基本数据单元。用函数式变成Mapreduce代替SQL，SQL是查询语句，而Mapreduce则是使用脚本和代码，而对于适用于关系型数据库，习惯SQL的Hadoop有开源工具hive代替。
+(2)Hadoop就是一个分布式计算的解决方案.
+
+
+
+hadoop能做什么？
+
+ hadoop擅长日志分析，facebook就用Hive来进行日志分析，2009年时facebook就有非编程人员的30%的人使用HiveQL进行数据分析；淘宝搜索中    的 自定义筛选也使用的Hive；利用Pig还可以做高级的数据处理，包括Twitter、LinkedIn 上用于发现您可能认识的人，可以实现类似Amazon.com的协同过滤的推荐效果。淘宝的商品推荐也是！在Yahoo！的40%的Hadoop作业是用pig运行的，包括垃圾邮件的识别和过滤，还有用户特征建模。（2012年8月25新更新，天猫的推荐系统是hive，少量尝试mahout！）
+
+     下面举例说明：
+
+      设想一下这样的应用场景. 我有一个100M 的数据库备份的sql 文件.我现在想在不导入到数据库的情况下直接用grep操作通过正则过滤出我想要的内容。例如：某个表中 含有相同关键字的记录那么有几种方式,一种是直接用Linux的命令 grep 还有一种就是通过编程来读取文件,然后对每行数据进行正则匹配得到结果好了 现在是100M 的数据库备份.上述两种方法都可以轻松应对.
+那么如果是1G , 1T 甚至 1PB 的数据呢 ,上面2种方法还能行得通吗？ 答案是不能.毕竟单台服务器的性能总有其上限.那么对于这种 超大数据文件怎么得到我们想要的结果呢？
+有种方法 就是分布式计算, 分布式计算的核心就在于 利用分布式算法 把运行在单台机器上的程序扩展到多台机器上并行运行.从而使数据处理能力成倍增加.但是这种分布式计算一般对编程人员要求很高,而且对服务器也有要求.导致了成本变得非常高.
+Haddop 就是为了解决这个问题诞生的.Haddop 可以很轻易的把 很多linux的廉价pc 组成 分布式结点,然后编程人员也不需要知道分布式算法之类,只需要根据mapreduce的规则定义好接口方法,剩下的就交给Haddop. 它会自动把相关的计算分布到各个结点上去,然后得出结果.
+例如上述的例子 ： Hadoop 要做的事 首先把 1PB的数据文件导入到 HDFS中, 然后编程人员定义好 map和reduce, 也就是把文件的行定义为key,每行的内容定义为value , 然后进行正则匹配,匹配成功则把结果 通过reduce聚合起来返回.Hadoop 就会把这个程序分布到N 个结点去并行的操作.
+那么原本可能需要计算好几天,在有了足够多的结点之后就可以把时间缩小到几小时之内.
+
+
+这也就是所谓的 大数据 云计算了.如果还是不懂的话再举个简单的例子
+比如  1亿个  1 相加 得出计算结果, 我们很轻易知道结果是 1亿.但是计算机不知道.那么单台计算机处理的方式做一个一亿次的循环每次结果+1
+那么分布式的处理方式则变成 我用 1万台 计算机,每个计算机只需要计算 1万个 1 相加 然后再有一台计算机把 1万台计算机得到的结果再相加
+从而得到最后的结果.
+理论上讲, 计算速度就提高了 1万倍. 当然上面可能是一个不恰当的例子.但所谓分布式,大数据,云计算 大抵也就是这么回事了.
+
+
+hadoop能为我司做什么？
+零数据基础，零数据平台，一切起点都是0。
+
+
+
+日志处理
+用户细分特征建模
+个性化广告推荐
+智能仪器推荐
+   一切以增加企业的商业价值为核心目的、最终目的
+怎么用hadoop
+hadoop的应用的在我司还属于研发型项目，拟用日志的分析来走通一次流程，因为此阶段目前来说还不需要数据挖掘的专业人员，在数据分析阶段即可，而系统有数据库工程师，Mapreduce有java开发工程师，而分析由我本人介入，而可视化暂时可由前端JS实现，本来我的调研方案，针对大数据的解决方案是hadoop+R的，但是对于R我们是完全不懂，在公司还没有大量投入人员的情况下，只有日志分析目前看来是最容易出成果的，也是可以通过较少人员能出一定成果的，所以选取了这个方向作为试点。
+docker安装hadoop
+2025年4月29号更新： 写这篇博客的时候对docker的使用还并不熟练，单独下载了namenode的image去配置了
+
+半天，那时候我还想着怎么缺这么多东西，现在想想我的操作完全忽略了docker的优点，其实再docker使用
+
+hadoop很简单，在github找到对应的项目，clone下来直接在docker-compose后就直接可以用了，我下面整这么
+
+多其实是镜像不全，我只使用了单个镜像，但实际是要用多个镜像导致的。
+
+下面是原文：
+
+前言：近期的大数据作业需要使用hadoop，不过都是要求在vmware的虚拟机中安装，因为有在用wsl2，不想关hyper-v，索性直接在docker中进行hadoop的安装
+
+安装第一步，先拉取镜像：
+
+docker pull bde2020/hadoop-base:2.0.0-hadoop2.7.4-java8
+然后再使用docker run启动容器，并进行端口映射
+
+docker run -it --name hadoop \
+  -p 9870:9870 -p 8088:8088 \
+  bde2020/hadoop-base:2.0.0-hadoop2.7.4-java8 /bin/bash
+9870是HDFS Web UI 的默认端口
+
+8088是YARN ResourceManager 的 默认Web UI 端口
+
+然后将core-site.xml和hdfs-core.xml更改为本篇文章最下面给出的内容
+
+然后就是启动服务
+
+# 格式化 HDFS（第一次使用需要格式化 NameNode）
+hdfs namenode -format
+
+# 启动 HDFS
+start-dfs.sh
+
+# 启动 YARN
+start-yarn.sh
+需要注意的是，这里需要找到你的start-dfs.sh和start-yarn.sh所在位置并运行,所以需要找到这两个启动shell的位
+
+置
+
+find / -name "start-dfs.sh"
+find / -name “start-yarn.sh"
+然后就可以访问 http://localhost:9870 查看 HDFS 状态，通过 http://localhost:8088 查看 YARN 状态
+
+了。
+
+按理说到这里就完成安装了，但是，我在运行start-dfs.sh时却遇上了
+
+Starting namenodes on [45bebd121e03]
+45bebd121e03: /opt/hadoop-2.7.4/sbin/slaves.sh: line 60: ssh: command not found
+localhost: /opt/hadoop-2.7.4/sbin/slaves.sh: line 60: ssh: command not found
+Starting secondary namenodes [0.0.0.0]
+0.0.0.0: /opt/hadoop-2.7.4/sbin/slaves.sh: line 60: ssh: command not found
+很明显，这个镜像里面没有ssh，我们要安装ssh
+
+apt-get install openssh-client
+apt-get install openssh-server
+但是，在安装ssh时问题又出现了
+
+W: Failed to fetch http://security.debian.org/dists/jessie/updates/main/binary-amd64/Packages 404 Not Found [IP: 151.101.2.132 80]
+这是因为 Debian Jessie 仓库已不再提供更新和支持。Debian Jessie（Debian 8）已经被官方停止支持，因此其
+
+软件包仓库不再可用
+
+我们通过使用archive.debian.org修改其中源地址来解决
+
+但是我们会发现，这个镜像里没有nano，也没有vim，想要安装又因为源无法安装
+
+这时候就需要使用系统自带echo来解决了
+
+echo "deb http://archive.debian.org/debian/ jessie main" > /etc/apt/sources.list
+echo "deb http://archive.debian.org/debian-security/ jessie/updates main" >> /etc/apt/sources.list
+然后再去安装ssh，发现成功了
+
+启动ssh
+
+service ssh status
+启动后 执行我们的start-dfs.sh 发现又有问题了
+
+让我们输入密码的密码错误，这是因为没有设置ssh的免密登陆
+
+先生成密钥对 ：
+
+ssh-keygen -t rsa -P ""
+再添加到authorized_keys中
+
+cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+然后再去运行启动shell
+
+发现怎么又又又报错了
+
+这次是
+
+0.0.0.0: Warning: Permanently added '0.0.0.0' (ECDSA) to the list of known hosts.
+0.0.0.0: Error: JAVA_HOME is not set and could not be found.
+原来是没有设置java环境变量
+
+先查看java路径
+
+update-alternatives --config java
+再将路径设置为环境变量
+
+export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+export PATH=$JAVA_HOME/bin:$PATH
+需要注意，设置环境变量的java地址只需要到版本目录即可，我们通过上面的命令会直接给下一级的/bin/java路径
+
+但我们不需要到这一级
+
+然后我们再运行NameNode启动程序，终于成功了。
+
+通过上面不断的报错和解决问题，终于完成了hadoop在docker的部署。
+
+当我们下一次想要启动时
+
+docker exec -it hadoop /bin/bash
+/usr/sbin/sshd
+/opt/hadoop-2.7.4/sbin/start-dfs.sh
+这里给出core-site.xml
+
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+  <!-- Hadoop 文件系统的默认URI -->
+  <property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://localhost:8020</value>
+  </property>
+
+  <!-- 临时目录配置 -->
+  <property>
+    <name>hadoop.tmp.dir</name>
+    <value>/tmp/hadoop</value>
+  </property>
+
+  <!-- 设置MapReduce的默认实现 -->
+  <property>
+    <name>mapreduce.framework.name</name>
+    <value>yarn</value>
+  </property>
+
+  <!-- 客户端的超时设置 -->
+  <property>
+    <name>fs.hdfs.impl</name>
+    <value>org.apache.hadoop.hdfs.DistributedFileSystem</value>
+  </property>
+</configuration>
+
+和hdfs-site.xml
+
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+  <property>
+    <name>dfs.namenode.rpc-bind-host</name>
+    <value>0.0.0.0</value>
+  </property>
+  <property>
+    <name>dfs.namenode.servicerpc-bind-host</name>
+    <value>0.0.0.0</value>
+  </property>
+  <property>
+    <name>dfs.namenode.http-bind-host</name>
+    <value>0.0.0.0</value>
+  </property>
+  <property>
+    <name>dfs.namenode.https-bind-host</name>
+    <value>0.0.0.0</value>
+  </property>
+  <property>
+    <name>dfs.client.use.datanode.hostname</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>dfs.datanode.use.datanode.hostname</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>dfs.namenode.rpc-address</name>
+    <value>localhost:8020</value> 
+</property>
+</configuration>
+Hadoop生态系统：从小白到老司机的入门指南
+1. 前言：Hadoop到底是个啥？
+说到大数据，很多人第一时间想到的就是Hadoop。但Hadoop到底是个啥？简单来说，它是一个用来存储和处理大规模数据的分布式系统，适用于海量数据处理场景。很多互联网巨头，如阿里、腾讯、字节跳动，都在使用它。
+
+想象一下，如果你的电脑存不下TB级的数据，那就可以用Hadoop的HDFS（分布式文件系统）把数据拆开，存到多台机器上；如果你的CPU算不动这些数据，那就可以用MapReduce或者Spark来并行计算，把任务分给多台机器一起算。
+
+2. Hadoop生态系统全家桶
+Hadoop生态系统其实是一整个大数据工具集合，主要包括以下几大件：
+
+HDFS（Hadoop Distributed File System）：存数据的，数据分布在多个节点上。
+YARN（Yet Another Resource Negotiator）：Hadoop的资源管理器，负责调度计算任务。
+MapReduce：Hadoop最初的计算框架，但现在大多数场景下用Spark代替了。
+Hive：用SQL查询HDFS上的数据，适合数据分析。
+HBase：Hadoop版的NoSQL数据库，适合存储海量结构化数据。
+Spark：大数据计算神器，比MapReduce快一个数量级。
+Flink：流式计算框架，适用于实时数据分析。
+下面，我们通过一个简单的例子，看看Hadoop是怎么存数据、处理数据的。
+
+3. 代码实战：HDFS数据存取 + MapReduce计算
+3.1 HDFS 数据存取
+首先，我们在HDFS上创建一个文件，并向其中写入数据。
+
+代码语言：bash
+AI代码解释
+# 启动Hadoop
+start-dfs.sh
+
+# 在HDFS创建目录
+hdfs dfs -mkdir /user/hadoop/input
+
+# 上传本地文件到HDFS
+hdfs dfs -put local_file.txt /user/hadoop/input/
+
+# 查看文件是否上传成功
+hdfs dfs -ls /user/hadoop/input/
+3.2 编写一个MapReduce程序
+下面用Java编写一个简单的MapReduce程序，统计HDFS上的文件中每个单词出现的次数。
+
+Mapper 代码（WordCountMapper.java）：
+代码语言：java
+AI代码解释
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Mapper;
+import java.io.IOException;
+
+public class WordCountMapper extends Mapper<Object, Text, Text, IntWritable> {
+    private final static IntWritable one = new IntWritable(1);
+    private Text word = new Text();
+    
+    @Override
+    protected void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+        String[] words = value.toString().split(" ");
+        for (String w : words) {
+            word.set(w);
+            context.write(word, one);
+        }
+    }
+}
+Reducer 代码（WordCountReducer.java）：
+代码语言：java
+AI代码解释
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Reducer;
+import java.io.IOException;
+
+public class WordCountReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
+    @Override
+    protected void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+        int sum = 0;
+        for (IntWritable val : values) {
+            sum += val.get();
+        }
+        context.write(key, new IntWritable(sum));
+    }
+}
+运行后，我们可以在HDFS上看到每个单词的统计结果。
+
+4. Hadoop的优缺点
+4.1 Hadoop的优势
+可扩展性强：HDFS和MapReduce可以横向扩展到成百上千台机器。
+成本低：相较于传统的高性能计算集群，Hadoop可以跑在便宜的商用服务器上。
+适用于批处理：处理TB级以上的数据时，Hadoop的并行计算优势明显。
+4.2 Hadoop的不足
+实时性差：Hadoop适用于离线批处理，处理实时数据时会比较慢。
+学习成本高：Hadoop生态系统复杂，上手有一定难度。
+维护成本高：Hadoop需要专业的运维团队来管理集群。
+5. 未来发展趋势
+虽然Hadoop曾经风光无限，但现在Spark、Flink等新技术正逐渐取代传统的MapReduce计算框架。不过，HDFS依然是大数据存储的重要选项，YARN仍然是很多企业的资源管理核心。
+
+目前，云计算的发展让Hadoop逐渐向云端迁移，例如AWS EMR、Azure HDInsight等，都是Hadoop云端化的代表。未来，大数据技术可能会更加智能化，结合AI和自动化运维，降低运维和开发成本。
+
+6. 结语
+Hadoop生态系统是大数据处理的基石，即便技术在发展，HDFS、Hive等组件仍然在企业级应用中广泛使用。如果你是一个大数据初学者，建议从Hadoop入手，逐步学习Hive、Spark，再深入到流式计算和云计算，才能真正成为大数据高手。

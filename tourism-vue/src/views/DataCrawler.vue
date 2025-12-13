@@ -82,7 +82,7 @@
                   />
                 </template>
               </el-table-column>
-              <el-table-column label="指令控制" width="180" fixed="right" align="right">
+<!--              <el-table-column label="指令控制" width="180" fixed="right" align="right">
                 <template #default="{ row }">
                   <div class="action-group">
                     <el-tooltip content="停止" v-if="row.status === 'running'">
@@ -96,7 +96,7 @@
                     </el-tooltip>
                   </div>
                 </template>
-              </el-table-column>
+              </el-table-column>-->
             </el-table>
 
             <div class="pagination-wrapper">
@@ -129,21 +129,38 @@
               <div class="control-title">数据爬取控制台</div>
               <div class="control-form">
                 <el-form :model="crawlForm" label-position="top" class="tech-form">
-                  <el-form-item label="爬取数量 / Crawl Count">
+                  <el-form-item label="爬取模式 / Crawl Mode">
                     <el-radio-group v-model="crawlForm.mode" class="crawl-radio-group">
                       <el-radio-button label="custom">指定数量</el-radio-button>
-                      <el-radio-button label="all">全部爬取</el-radio-button>
+                      <el-radio-button label="full">全量爬取</el-radio-button>
                     </el-radio-group>
                   </el-form-item>
-                  <el-form-item label="数量设置" v-if="crawlForm.mode === 'custom'">
+                  <el-form-item label="景点数量 / Max Spots" v-if="crawlForm.mode === 'custom'">
                     <el-input-number
-                        v-model="crawlForm.targetCount"
-                        :min="10"
-                        :max="10000"
-                        :step="100"
+                        v-model="crawlForm.maxSpots"
+                        :min="5"
+                        :max="500"
+                        :step="5"
                         style="width: 100%"
                         class="tech-number-input"
                     />
+                    <span class="input-hint">爬取几个景点</span>
+                  </el-form-item>
+                  <el-form-item label="每景点评论数 / Reviews Per Spot" v-if="crawlForm.mode === 'custom'">
+                    <el-input-number
+                        v-model="crawlForm.reviewsPerSpot"
+                        :min="5"
+                        :max="200"
+                        :step="5"
+                        style="width: 100%"
+                        class="tech-number-input"
+                    />
+                    <span class="input-hint">每个景点爬取几条评论</span>
+                  </el-form-item>
+                  <el-form-item v-if="crawlForm.mode === 'full'">
+                    <el-alert type="info" :closable="false" show-icon>
+                      全量模式将爬取所有福州景点和评论，耗时较长
+                    </el-alert>
                   </el-form-item>
                 </el-form>
                 <el-button 
@@ -273,7 +290,8 @@ const pagination = reactive({
 
 const crawlForm = reactive({
   mode: 'custom',
-  targetCount: 500
+  maxSpots: 50,
+  reviewsPerSpot: 20
 })
 
 const crawlLoading = ref(false)
@@ -324,10 +342,15 @@ const fetchSystemStatus = async () => {
 }
 
 const handleStartCrawl = async () => {
-  const targetCount = crawlForm.mode === 'all' ? 10000 : crawlForm.targetCount
+  const params = crawlForm.mode === 'full' 
+    ? { crawl_mode: 'full', max_spots: -1, reviews_per_spot: -1 }
+    : { max_spots: crawlForm.maxSpots, reviews_per_spot: crawlForm.reviewsPerSpot }
+  
+  const totalEstimate = crawlForm.mode === 'full' ? '全部' : (params.max_spots * params.reviews_per_spot)
+  const modeText = crawlForm.mode === 'full' ? '全量爬取（所有景点和评论）' : `${params.max_spots}个景点 x ${params.reviews_per_spot}条评论`
   
   ElMessageBox.confirm(
-      `确定要开始爬取${crawlForm.mode === 'all' ? '全部' : targetCount + '条'}数据吗？数据将自动存入Hadoop。`,
+      `确定要开始爬取吗？\n模式: ${modeText}\n预计数据量: 约${totalEstimate}条\n数据将自动存入Hadoop HDFS`,
       '确认爬取',
       {
         confirmButtonText: '开始爬取',
@@ -338,7 +361,7 @@ const handleStartCrawl = async () => {
   ).then(async () => {
     crawlLoading.value = true
     try {
-      const res = await adminCrawlFuzhouAPI({ target_count: targetCount })
+      const res = await adminCrawlFuzhouAPI(params)
       if (res.code === 200) {
         ElMessage.success('数据爬取任务已启动！')
         fetchTaskList()

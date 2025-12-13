@@ -56,6 +56,18 @@ const router = createRouter({
           name: 'ScenicManage',
           component: () => import('@/views/ScenicManage.vue'),
           meta: { title: '景点数据管理', icon: 'Files' }
+        },
+        {
+          path: 'health',
+          name: 'Health',
+          component: () => import('@/views/Health.vue'),
+          meta: { title: '系统健康监控', icon: 'Monitor' }
+        },
+        {
+          path: 'cache-manage',
+          name: 'CacheManage',
+          component: () => import('@/views/CacheManage.vue'),
+          meta: { title: '缓存管理', icon: 'Coin' }
         }
       ]
     }

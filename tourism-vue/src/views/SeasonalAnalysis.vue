@@ -5,24 +5,7 @@
       <div class="console-decoration left"></div>
 
       <el-form :inline="true" :model="queryParams" class="tech-form">
-        <el-form-item label="分析对象 / Target">
-          <el-select
-              v-model="queryParams.spotId"
-              @change="handleFilterChange"
-              placeholder="请选择分析对象"
-              popper-class="tech-popper"
-              class="tech-select"
-          >
-            <!-- 核心修复：添加福州全域选项 -->
-            <el-option label="福州全域 (总体分析)" value="" />
-            <el-option
-                v-for="spot in scenicList"
-                :key="spot.id"
-                :label="spot.name"
-                :value="spot.name"
-            />
-          </el-select>
-        </el-form-item>
+
 
         <el-form-item label="时间维度 / Year">
           <el-date-picker
@@ -84,7 +67,7 @@
           <div class="panel-header">
             <div class="header-title">
               <el-icon class="icon"><Calendar /></el-icon>
-              <span class="title">AI 智能出行建议引擎</span>
+              <span class="title">最佳游玩建议</span>
             </div>
             <div class="header-line"></div>
           </div>
@@ -251,7 +234,8 @@ const handleFilterChange = () => {
 }
 
 const formatNumber = (num) => {
-  return num ? (num / 10000).toFixed(1) + 'w' : '0'
+  if (!num) return '0'
+  return num.toLocaleString('zh-CN')
 }
 
 // --- ECharts 配置 (暗黑科技风) ---

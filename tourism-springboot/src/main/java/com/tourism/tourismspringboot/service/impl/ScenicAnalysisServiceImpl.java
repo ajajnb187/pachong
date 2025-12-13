@@ -971,7 +971,7 @@ public class ScenicAnalysisServiceImpl implements IScenicAnalysisService {
     public Map<String, Object> getRecommendVisitTime(String spotId) {
         log.info("查询建议游玩时间: spotId={}", spotId);
         
-        String cacheKey = "analysis:recommend:time:" + spotId;
+        String cacheKey = "analysis:recommend:time:" + (spotId != null ? spotId : "all");
         Object cached = redisCacheService.get(cacheKey);
         if (cached != null && cached instanceof Map) {
             log.info("从Redis缓存获取建议游玩时间");
@@ -983,24 +983,40 @@ public class ScenicAnalysisServiceImpl implements IScenicAnalysisService {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            // 查询景区基本信息
-            String infoSql = 
-                "SELECT scenic_spot FROM tourism_db.fuzhou_reviews WHERE scenic_spot = ? LIMIT 1";
-            String spotName = hiveJdbcTemplate.queryForObject(infoSql, new Object[]{spotId}, String.class);
-            result.put("spotName", spotName);
+            // 设置名称：如果spotId为空，则为福州全域
+            if (spotId == null || spotId.trim().isEmpty()) {
+                result.put("spotName", "福州全域");
+            } else {
+                result.put("spotName", spotId);
+            }
 
-            // 查询该景区的月度客流量和评分分布
-            String sql = 
+            // 查询月度客流量和评分分布
+            StringBuilder sql = new StringBuilder(
                 "SELECT " +
                 "    MONTH(travel_date) as month, " +
                 "    COUNT(*) as visitor_count, " +
                 "    AVG(rating) as avg_rating " +
                 "FROM tourism_db.fuzhou_reviews " +
-                "WHERE scenic_spot = ? " +
-                "GROUP BY MONTH(travel_date) " +
-                "ORDER BY month";
+                "WHERE 1=1 ");
+            
+            List<Object> params = new ArrayList<>();
+            if (spotId != null && !spotId.trim().isEmpty()) {
+                sql.append("AND scenic_spot = ? ");
+                params.add(spotId);
+            }
+            
+            sql.append("GROUP BY MONTH(travel_date) ORDER BY month");
 
-            List<Map<String, Object>> monthlyData = hiveJdbcTemplate.queryForList(sql, spotId);
+            List<Map<String, Object>> monthlyData = hiveJdbcTemplate.query(
+                sql.toString(), 
+                params.toArray(),
+                (rs, rowNum) -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("month", rs.getInt("month"));
+                    map.put("visitor_count", rs.getLong("visitor_count"));
+                    map.put("avg_rating", rs.getDouble("avg_rating"));
+                    return map;
+                });
 
             if (!monthlyData.isEmpty()) {
                 // 计算平均客流量

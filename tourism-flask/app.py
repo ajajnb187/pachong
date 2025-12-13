@@ -416,7 +416,8 @@ def admin_crawl_fuzhou_all():
     
     请求参数（可选）:
     {
-        "target_count": 500,  // 目标数据量，默认500条，设置为0或-1表示全量爬取
+        "max_spots": 50,  // 爬取景点数量，默认50个，设置为0或-1表示爬取所有景点
+        "reviews_per_spot": 20,  // 每个景点爬取评论数，默认20条，设置为0或-1表示爬取所有评论
         "crawl_mode": "full"  // full=全量爬取, limit=限量爬取（默认）
     }
     """
@@ -424,13 +425,20 @@ def admin_crawl_fuzhou_all():
         data = request.get_json() if request.is_json else {}
         
         # 参数处理
-        target_count = int(data.get('target_count', 500))
+        max_spots = int(data.get('max_spots', 50))  # 默认爬取50个景点
+        reviews_per_spot = int(data.get('reviews_per_spot', 20))  # 每个景点默认20条评论
         crawl_mode = data.get('crawl_mode', 'limit')
         
-        # 全量爬取模式：设置一个很大的数字
-        if crawl_mode == 'full' or target_count <= 0:
-            target_count = 10000  # 设置为10000条，基本上能覆盖所有福州景区
-            crawl_mode = 'full'
+        # 全量爬取模式：设置为-1表示不限制，爬取所有能爬到的数据
+        if crawl_mode == 'full':
+            max_spots = -1  # -1表示爬取所有景点
+            reviews_per_spot = -1  # -1表示爬取所有评论
+        
+        # 兼容旧参数 target_count
+        if 'target_count' in data and 'max_spots' not in data:
+            target_count = int(data.get('target_count', 500))
+            max_spots = max(10, target_count // 20)  # 估算景点数
+            reviews_per_spot = 20
         
         data_source = 'ctrip'
         
@@ -439,10 +447,10 @@ def admin_crawl_fuzhou_all():
         try:
             # 创建管理员爬取任务
             task = CrawlerTask(
-                task_name=f'【管理员】福州所有景区数据采集-{datetime.now().strftime("%Y%m%d%H%M%S")}',
+                task_name=f'【管理员】福州景区采集({max_spots}景点x{reviews_per_spot}评论)-{datetime.now().strftime("%Y%m%d%H%M%S")}',
                 scenic_spot_name='福州',  # 爬取所有福州景区
                 data_source=data_source,
-                target_count=target_count,
+                target_count=max_spots,  # 记录景点数量
                 status='pending',
                 create_by=1  # 管理员用户ID
             )
@@ -453,15 +461,13 @@ def admin_crawl_fuzhou_all():
             
             task_id = task.id
             
-            logger.info(f"管理员启动福州全景区爬取: ID={task_id}, 目标={target_count}条")
+            logger.info(f"管理员启动福州景区爬取: ID={task_id}, 景点={max_spots}个, 每景点评论={reviews_per_spot}条")
             
             # 启动后台线程执行爬取任务（使用V2版本）
             import threading
-            # 计算每个景点爬取的评论数
-            reviews_per_spot = max(10, target_count // 100)  # 假设100个景点
             thread = threading.Thread(
                 target=execute_crawl_fuzhou_complete,
-                args=(task_id, reviews_per_spot)
+                args=(task_id, max_spots, reviews_per_spot)
             )
             thread.daemon = True
             thread.start()
@@ -473,7 +479,9 @@ def admin_crawl_fuzhou_all():
                     'task_id': task_id,
                     'scenic_spot_name': '福州（所有景区）',
                     'data_source': data_source,
-                    'target_count': target_count,
+                    'max_spots': max_spots,
+                    'reviews_per_spot': reviews_per_spot,
+                    'total_target': max_spots * reviews_per_spot,
                     'status': 'running',
                     'note': '数据将自动存入Hadoop HDFS',
                     'create_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')

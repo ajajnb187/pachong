@@ -10,7 +10,7 @@ from crawlers.ctrip_crawler_v2 import CtripCrawlerV2
 from utils.logger import logger
 from config import Config
 
-def execute_crawl_fuzhou_complete(task_id, reviews_per_spot=20):
+def execute_crawl_fuzhou_complete(task_id, max_spots=50, reviews_per_spot=20):
     """
     执行完整的福州景区数据爬取任务
     
@@ -19,10 +19,12 @@ def execute_crawl_fuzhou_complete(task_id, reviews_per_spot=20):
     2. 为每个景点爬取用户评论 -> fuzhou_reviews表
     3. 分别存储到不同的JSONL文件
     4. 上传到Hadoop HDFS
+    5. 清理Redis缓存，确保新数据生效
     
     Args:
         task_id: 任务ID
-        reviews_per_spot: 每个景点爬取的评论数（默认20条）
+        max_spots: 爬取的景点数量（默认50个，0或-1表示全量爬取）
+        reviews_per_spot: 每个景点爬取的评论数（默认20条，0或-1表示全量爬取）
     """
     db = SessionLocal()
     task = None
@@ -39,9 +41,18 @@ def execute_crawl_fuzhou_complete(task_id, reviews_per_spot=20):
         db.commit()
         
         # 从task获取目标数量（景点数量）
-        max_spots = task.target_count if task.target_count else 500
+        if task.target_count:
+            max_spots = task.target_count
+        
+        # 全量爬取模式：0或-1表示不限制
+        is_full_mode = (max_spots <= 0 or reviews_per_spot <= 0)
+        if max_spots <= 0:
+            max_spots = 999999  # 设置一个极大值，爬取所有
+        if reviews_per_spot <= 0:
+            reviews_per_spot = 999999  # 设置一个极大值，爬取所有
+        
         logger.info(f"========== 任务{task_id}开始 ==========")
-        logger.info(f"目标：爬取{max_spots}个景点，每个景点{reviews_per_spot}条评论")
+        logger.info(f"模式: {'全量爬取（所有景点和评论）' if is_full_mode else f'限量爬取（{max_spots}个景点 x {reviews_per_spot}条评论）'}")
         
         # 初始化爬虫
         crawler = CtripCrawlerV2()
@@ -136,6 +147,12 @@ def execute_crawl_fuzhou_complete(task_id, reviews_per_spot=20):
         logger.info("="*60)
         repair_hive_partitions()
         
+        # 清理Redis缓存，确保新数据生效
+        logger.info("="*60)
+        logger.info("清理Redis缓存...")
+        logger.info("="*60)
+        clear_redis_cache()
+        
         # 更新任务状态
         task.status = 'completed'
         task.end_time = datetime.now()
@@ -144,8 +161,9 @@ def execute_crawl_fuzhou_complete(task_id, reviews_per_spot=20):
         db.commit()
         
         logger.info("=" * 60)
-        logger.info(f"任务完成: 景点{len(all_spots)}个, 评论{len(all_reviews)}条")
+        logger.info(f"✅ 任务完成: 景点{len(all_spots)}个, 评论{len(all_reviews)}条")
         logger.info(f"HDFS路径: 景点={hdfs_spots_path}, 评论={hdfs_reviews_path}")
+        logger.info("Redis缓存已清理，新数据已生效")
         logger.info("=" * 60)
         
     except Exception as e:
@@ -314,4 +332,30 @@ def repair_hive_partitions():
         
     except Exception as e:
         logger.error(f"修复Hive分区异常: {str(e)}")
+        return False
+
+
+def clear_redis_cache():
+    """
+    清理Spring Boot应用的Redis缓存
+    爬取完成后调用，确保新数据生效
+    """
+    import requests
+    
+    try:
+        # 调用Spring Boot的缓存清理API
+        spring_boot_url = 'http://localhost:8080/api/cache/clear-all'
+        
+        logger.info(f"正在清理Redis缓存: {spring_boot_url}")
+        response = requests.post(spring_boot_url, timeout=10)
+        
+        if response.status_code == 200:
+            logger.info("✅ Redis缓存清理成功")
+            return True
+        else:
+            logger.warning(f"Redis缓存清理失败: HTTP {response.status_code}")
+            return False
+            
+    except Exception as e:
+        logger.warning(f"清理Redis缓存失败（可能Spring Boot未启动）: {str(e)}")
         return False

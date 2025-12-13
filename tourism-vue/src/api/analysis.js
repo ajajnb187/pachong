@@ -47,11 +47,11 @@ export const getScenicRankingAPI = (params) => {
   })
 }
 
-export const getVisitorSourceAPI = (spotId) => {
+export const getVisitorSourceAPI = (params) => {
   return request({
     url: '/analysis/visitor-source',
     method: 'GET',
-    params: { spotId }
+    params
   })
 }
 
@@ -71,10 +71,10 @@ export const getReviewUserCountAPI = (spotId) => {
   })
 }
 
-export const getRecommendVisitTimeAPI = (spotId) => {
+export const getRecommendVisitTimeAPI = (params) => {
   return request({
     url: '/analysis/recommend-visit-time',
     method: 'GET',
-    params: { spotId }
+    params
   })
 }

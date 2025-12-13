@@ -13,7 +13,10 @@ engine = create_engine(
     echo=Config.SQLALCHEMY_ECHO,
     pool_pre_ping=True,
     pool_recycle=3600,
-    connect_args={'charset': 'utf8mb4'}
+    connect_args={
+        'charset': 'utf8mb4',
+        'init_command': "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
+    }
 )
 
 # 创建会话工厂

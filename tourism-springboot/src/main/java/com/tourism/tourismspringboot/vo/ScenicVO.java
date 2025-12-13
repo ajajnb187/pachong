@@ -9,13 +9,29 @@ import java.io.Serializable;
 @Data
 public class ScenicVO implements Serializable {
     
-    private String spotId;
+    private Integer businessId;
     
-    private String spotName;
+    private String scenicSpot;
     
-    private Long totalReviews;
+    private String city;
     
-    private Double avgRating;
+    private String zoneName;
     
-    private Long totalVisitors;
+    private Double commentScore;
+    
+    private Double heatScore;
+    
+    private String sightLevel;
+    
+    private String marketPrice;
+    
+    private String isFree;
+    
+    private String coverImageUrl;
+    
+    private String detailUrl;
+    
+    private Double latitude;
+    
+    private Double longitude;
 }

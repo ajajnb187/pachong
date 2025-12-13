@@ -9,7 +9,8 @@ from datetime import datetime
 from config import Config
 from models.database import SessionLocal, init_db
 from models.task import CrawlerTask
-from tasks.crawl_task import execute_crawl_task
+from tasks.crawl_task import execute_crawl_task, execute_crawl_task_direct
+from tasks.crawl_task_v2 import execute_crawl_fuzhou_complete
 from utils.logger import logger
 
 # 创建Flask应用
@@ -17,8 +18,8 @@ app = Flask(__name__)
 app.config.from_object(Config)
 CORS(app)  # 允许跨域请求
 
-# 初始化数据库
-init_db()
+# 数据库初始化由用户手动执行，不自动创建表
+# init_db()
 
 @app.route('/', methods=['GET'])
 def index():
@@ -48,7 +49,7 @@ def start_crawl():
                 }), 400
         
         # 验证数据来源（目前只实现了携程）
-        if data['data_source'] != 'ctrip':
+        if data['data_source'] != '携程':
             return jsonify({
                 'code': 400,
                 'msg': '目前仅支持携程数据源 (data_source=ctrip)'
@@ -83,21 +84,20 @@ def start_crawl():
             
             logger.info(f"创建爬取任务: ID={task_id}, 景区={data['scenic_spot_name']}, 来源={data['data_source']}")
             
-            # 异步执行爬取任务
-            celery_task = execute_crawl_task.delay(
-                task_id,
-                data['scenic_spot_name'],
-                data['data_source'],
-                int(data['target_count']),
-                data['data_type']
+            # 启动后台线程执行爬取任务
+            import threading
+            thread = threading.Thread(
+                target=execute_crawl_task_direct,
+                args=(task_id, data['scenic_spot_name'], data['data_source'], int(data['target_count']), data['data_type'])
             )
+            thread.daemon = True
+            thread.start()
             
             return jsonify({
                 'code': 200,
                 'msg': '任务已启动',
                 'data': {
                     'task_id': task_id,
-                    'celery_task_id': celery_task.id,
                     'status': 'running',
                     'create_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 }
@@ -321,14 +321,73 @@ def get_scenic_list():
         }
     })
 
+@app.route('/api/admin/crawl/test', methods=['POST'])
+def admin_crawl_test():
+    """
+    测试接口：爬取少量数据测试Hadoop上传
+    
+    只爬取3个景点，每个景点3条评论，用于测试上传功能
+    """
+    try:
+        from tasks.crawl_task_v2 import execute_crawl_fuzhou_complete
+        
+        db = SessionLocal()
+        
+        try:
+            task = CrawlerTask(
+                task_name=f'【测试】少量数据测试-{datetime.now().strftime("%Y%m%d%H%M%S")}',
+                scenic_spot_name='福州',
+                data_source='ctrip',
+                target_count=3,  # 只爬3条
+                status='pending',
+                create_by=1
+            )
+            
+            db.add(task)
+            db.commit()
+            db.refresh(task)
+            
+            task_id = task.id
+            
+            logger.info(f"测试任务启动: ID={task_id}")
+            
+            # 启动后台线程
+            import threading
+            thread = threading.Thread(
+                target=execute_crawl_fuzhou_complete,
+                args=(task_id,)
+            )
+            thread.daemon = True
+            thread.start()
+            
+            return jsonify({
+                'code': 200,
+                'msg': '测试任务已启动',
+                'data': {
+                    'task_id': task_id,
+                    'note': '只爬取3个景点，每个3条评论，测试Hadoop上传'
+                }
+            })
+            
+        finally:
+            db.close()
+        
+    except Exception as e:
+        logger.error(f"测试任务启动失败: {str(e)}")
+        return jsonify({
+            'code': 500,
+            'msg': f'启动失败: {str(e)}'
+        }), 500
+
+
 @app.route('/api/admin/crawl/fuzhou', methods=['POST'])
 def admin_crawl_fuzhou_all():
     """
     管理员专用：一键爬取福州所有景区评论数据并存入Hadoop
     
     功能说明：
-    1. 自动爬取福州所有热门景区的用户评论数据
-    2. 数据包含：景区信息、评分、评论内容、旅游日期、评论日期等
+    1. 自动爬取福州所有热门景区的用户评论数据（含真实评论和官方描述）
+    2. 数据包含：景区信息、评分、评论内容、图片URL、旅游日期、评论日期等
     3. 自动存储到Hadoop HDFS（JSONL格式）
     4. 可直接用于Hive建表和数据分析
     
@@ -337,11 +396,10 @@ def admin_crawl_fuzhou_all():
     
     Hive建表语句：
     CREATE EXTERNAL TABLE fuzhou_reviews (
-        review_id STRING COMMENT '评论ID',
-        spot_id STRING COMMENT '景区ID',
-        spot_name STRING COMMENT '景区名称',
-        visitor_name STRING COMMENT '游客昵称',
+        scenic_spot STRING COMMENT '景区名称',
+        city STRING COMMENT '城市',
         rating DOUBLE COMMENT '评分(1-5)',
+        visitor_name STRING COMMENT '游客昵称',
         review_content STRING COMMENT '评论内容',
         review_images STRING COMMENT '评论图片JSON数组',
         travel_date STRING COMMENT '旅游日期YYYY-MM-DD',
@@ -358,14 +416,22 @@ def admin_crawl_fuzhou_all():
     
     请求参数（可选）:
     {
-        "target_count": 500  // 目标数据量，默认500条
+        "target_count": 500,  // 目标数据量，默认500条，设置为0或-1表示全量爬取
+        "crawl_mode": "full"  // full=全量爬取, limit=限量爬取（默认）
     }
     """
     try:
         data = request.get_json() if request.is_json else {}
         
-        # 默认参数（只支持携程）
+        # 参数处理
         target_count = int(data.get('target_count', 500))
+        crawl_mode = data.get('crawl_mode', 'limit')
+        
+        # 全量爬取模式：设置一个很大的数字
+        if crawl_mode == 'full' or target_count <= 0:
+            target_count = 10000  # 设置为10000条，基本上能覆盖所有福州景区
+            crawl_mode = 'full'
+        
         data_source = 'ctrip'
         
         db = SessionLocal()
@@ -389,21 +455,22 @@ def admin_crawl_fuzhou_all():
             
             logger.info(f"管理员启动福州全景区爬取: ID={task_id}, 目标={target_count}条")
             
-            # 异步执行爬取任务
-            celery_task = execute_crawl_task.delay(
-                task_id,
-                '福州',  # 景区名称
-                data_source,
-                target_count,
-                'review'  # 爬取评论数据
+            # 启动后台线程执行爬取任务（使用V2版本）
+            import threading
+            # 计算每个景点爬取的评论数
+            reviews_per_spot = max(10, target_count // 100)  # 假设100个景点
+            thread = threading.Thread(
+                target=execute_crawl_fuzhou_complete,
+                args=(task_id, reviews_per_spot)
             )
+            thread.daemon = True
+            thread.start()
             
             return jsonify({
                 'code': 200,
                 'msg': '福州所有景区数据采集任务已启动',
                 'data': {
                     'task_id': task_id,
-                    'celery_task_id': celery_task.id,
                     'scenic_spot_name': '福州（所有景区）',
                     'data_source': data_source,
                     'target_count': target_count,

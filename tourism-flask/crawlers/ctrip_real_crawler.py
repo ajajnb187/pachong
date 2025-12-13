@@ -126,9 +126,14 @@ class CtripRealCrawler:
                             tags_str = "、".join(tag_name_list) if isinstance(tag_name_list, list) else str(tag_name_list)
                             review_content += f"，标签：{tags_str}"
                         if market_price:
-                            review_content += f"，门票：¥{market_price}"
+                            review_content += f"，门票：{market_price}"
                         elif is_free:
                             review_content += "，免费开放"
+                        
+                        # 提取官方图片
+                        official_images = []
+                        if cover_image_url:
+                            official_images.append(cover_image_url)
                         
                         review_data = {
                             'scenic_spot': poi_name or '',
@@ -136,8 +141,12 @@ class CtripRealCrawler:
                             'rating': float(comment_score) if comment_score else 5.0,
                             'visitor_name': '携程官方',
                             'review_content': review_content,
+                            'review_images': json.dumps(official_images, ensure_ascii=False) if official_images else '[]',
                             'travel_date': datetime.now().strftime('%Y-%m-%d'),
                             'review_date': datetime.now().strftime('%Y-%m-%d'),
+                            'helpful_count': 3,
+                            'visitor_level': sight_level or '',
+                            'visitor_location': zone_name or '',
                             'data_source': 'ctrip',
                             'crawl_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                         }
@@ -283,8 +292,12 @@ class CtripRealCrawler:
                             'rating': rating,
                             'visitor_name': user_name,
                             'review_content': content[:500],  # 限制长度
+                            'review_images': json.dumps(image_urls, ensure_ascii=False) if image_urls else '[]',
                             'travel_date': travel_date,
                             'review_date': review_date,
+                            'helpful_count': helpful_count,
+                            'visitor_level': user_level,
+                            'visitor_location': user_location,
                             'data_source': 'ctrip',
                             'crawl_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                         }

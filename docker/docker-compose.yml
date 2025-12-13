@@ -1,101 +1,149 @@
 version: '3.8'
 
 services:
-  # MySQL数据库服务
+  # ==========================================
+  # Hadoop NameNode
+  # ==========================================
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    restart: always
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=tourism
+    env_file:
+      - ./hadoop.env
+    networks:
+      - tourism-net
+
+  # ==========================================
+  # Hadoop DataNode
+  # ==========================================
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    restart: always
+    ports:
+      - "9864:9864"
+    volumes:
+      - hadoop_datanode:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    env_file:
+      - ./hadoop.env
+    networks:
+      - tourism-net
+
+  # ==========================================
+  # PostgreSQL - Hive Metastore数据库
+  # ==========================================
+  hive-metastore-postgresql:
+    image: postgres:11-alpine
+    container_name: hive-metastore-postgresql
+    restart: always
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_DB: metastore
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: hive
+    volumes:
+      - hive_postgresql:/var/lib/postgresql/data
+    networks:
+      - tourism-net
+
+  # ==========================================
+  # Hive Metastore
+  # ==========================================
+  hive-metastore:
+    image: bde2020/hive:2.3.2-postgresql-metastore
+    container_name: hive-metastore
+    restart: always
+    ports:
+      - "9083:9083"
+    env_file:
+      - ./hadoop.env
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870 datanode:9864 hive-metastore-postgresql:5432"
+    volumes:
+      - ./init-metastore.sh:/opt/init-metastore.sh
+    depends_on:
+      - hive-metastore-postgresql
+      - namenode
+      - datanode
+    command: /bin/bash /opt/init-metastore.sh
+    networks:
+      - tourism-net
+
+  # ==========================================
+  # Hive Server
+  # ==========================================
+  hive-server:
+    image: bde2020/hive:2.3.2-postgresql-metastore
+    container_name: hive-server
+    restart: always
+    ports:
+      - "10000:10000"
+      - "10002:10002"
+    env_file:
+      - ./hadoop.env
+    environment:
+      HIVE_CORE_CONF_javax_jdo_option_ConnectionURL: "jdbc:postgresql://hive-metastore-postgresql/metastore"
+      SERVICE_PRECONDITION: "hive-metastore:9083"
+    volumes:
+      - ./init-hive-tables.sh:/opt/init-hive-tables.sh
+      - ./init-hiveserver.sh:/opt/init-hiveserver.sh
+    depends_on:
+      - hive-metastore
+    command: /bin/bash /opt/init-hiveserver.sh
+    networks:
+      - tourism-net
+
+  # ==========================================
+  # Redis（无密码模式）
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: tourism-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --protected-mode no
+    networks:
+      - tourism-net
+
+  # ==========================================
+  # MySQL业务数据库
+  # ==========================================
   mysql:
     image: mysql:8.0
     container_name: tourism-mysql
     restart: always
+    ports:
+      - "23306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root123456
       MYSQL_DATABASE: tourism_db
       MYSQL_USER: tourism
       MYSQL_PASSWORD: tourism123
-    ports:
-      - "23306:3306"
     volumes:
-      - mysql-data:/var/lib/mysql
-      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - tourism-net
-
-  # Hadoop单机伪分布式 - 使用环境变量配置 + 自动化启动脚本
-  hadoop:
-    image: bde2020/hadoop-base:2.0.0-hadoop2.7.4-java8
-    container_name: hadoop
-    hostname: hadoop
-    restart: always
-    ports:
-      - "50070:50070"  # NameNode HTTP (Hadoop 2.x)
-      - "50075:50075"  # DataNode HTTP
-      - "8088:8088"    # YARN ResourceManager
-      - "8020:8020"    # NameNode RPC
-      - "9000:9000"    # Hadoop IPC
-    volumes:
-      - hadoop_data:/tmp/hadoop
-      - ./hadoop-init.sh:/opt/hadoop-init.sh
-      - ./hadoop-config/core-site.xml:/opt/hadoop-2.7.4/etc/hadoop/core-site.xml
-      - ./hadoop-config/hdfs-site.xml:/opt/hadoop-2.7.4/etc/hadoop/hdfs-site.xml
-    environment:
-      - CORE_CONF_fs_defaultFS=hdfs://hadoop:9000
-      - CORE_CONF_hadoop_tmp_dir=/tmp/hadoop
-      - HDFS_CONF_dfs_namenode_name_dir=file:///tmp/hadoop/dfs/name
-      - HDFS_CONF_dfs_datanode_data_dir=file:///tmp/hadoop/dfs/data
-      - HDFS_CONF_dfs_replication=1
-      - MAPRED_CONF_mapreduce_framework_name=yarn
-      - YARN_CONF_yarn_resourcemanager_hostname=hadoop
-      - YARN_CONF_yarn_nodemanager_pmem___check___enabled=false
-      - YARN_CONF_yarn_nodemanager_vmem___check___enabled=false
-      - YARN_CONF_yarn_nodemanager_aux___services=mapreduce_shuffle
-    command: bash /opt/hadoop-init.sh
-    mem_limit: 4g
-    mem_reservation: 2g
-    cpus: 2
-    networks:
-      - tourism-net
-
-  # Hive专用MySQL（元数据库）
-  hive-mysql:
-    image: mysql:5.7
-    container_name: hive-mysql
-    hostname: mysql
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: 123456
-      MYSQL_ALLOW_EMPTY_PASSWORD: no
-    ports:
-      - "3307:3306"
-    volumes:
-      - hive_mysql_data:/var/lib/mysql
-    networks:
-      - tourism-net
-
-  # Hive Server（自定义镜像，基于Hadoop2.7.4+Hive2.3.9）
-  hive-server:
-    build: .
-    container_name: hive-server
-    hostname: hive-server
-    restart: always
-    ports:
-      - "50000:10000"
-      - "9083:9083"
-    depends_on:
-      - hadoop
-      - hive-mysql
-    environment:
-      - HADOOP_HOME=/opt/hadoop-2.7.4
-      - HIVE_HOME=/opt/hive
-    volumes:
-      - ./conf/hive-site.xml:/opt/hive/conf/hive-site.xml
-      - ./hadoop-config/core-site.xml:/opt/hadoop-2.7.4/etc/hadoop/core-site.xml
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     networks:
       - tourism-net
 
 volumes:
-  mysql-data:
-  hadoop_data:
-  hadoop_logs:
-  hive_mysql_data:
+  hadoop_namenode:
+  hadoop_datanode:
+  hive_postgresql:
+  redis_data:
+  mysql_data:
 
 networks:
   tourism-net:

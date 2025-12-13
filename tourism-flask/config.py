@@ -25,16 +25,16 @@ class Config:
     SQLALCHEMY_ECHO = False
     
     # Celery配置
-    CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-    CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
+    CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://:redis123456@localhost:6379/0')
+    CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://:redis123456@localhost:6379/1')
     CELERY_TASK_SERIALIZER = 'json'
     CELERY_RESULT_SERIALIZER = 'json'
     CELERY_ACCEPT_CONTENT = ['json']
     CELERY_TIMEZONE = 'Asia/Shanghai'
     CELERY_ENABLE_UTC = True
     
-    # HDFS配置 (Hadoop 2.7.4 使用50070端口)
-    HDFS_URL = os.getenv('HDFS_URL', 'http://localhost:50070')
+    # HDFS配置 (Hadoop 3.2.1 使用9870端口)
+    HDFS_URL = os.getenv('HDFS_URL', 'http://localhost:9870')
     HDFS_USER = os.getenv('HDFS_USER', 'root')
     
     # 爬虫配置
@@ -63,3 +63,6 @@ class Config:
     
     # 福州城市ID（来自参考代码cities.csv）
     FUZHOU_CITY_ID = 164
+    
+    # 数据存储路径
+    DATA_RAW_PATH = os.path.join(os.path.dirname(__file__), 'data', 'raw')

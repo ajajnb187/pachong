@@ -34,7 +34,6 @@ spring:
   redis:
     host: localhost
     port: 6379
-    password: 
     database: 0
     timeout: 3000ms
     lettuce:
@@ -47,7 +46,7 @@ spring:
 # Hive配置
 hive:
   jdbc:
-    url: jdbc:hive2://localhost:50000/tourism_db
+    url: jdbc:hive2://localhost:10000/tourism_db
     username: 
     password: 
     driver-class-name: org.apache.hive.jdbc.HiveDriver

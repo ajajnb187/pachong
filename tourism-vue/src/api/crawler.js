@@ -83,14 +83,6 @@ export const getDataSourceListAPI = () => {
   })
 }
 
-// 获取景区列表
-export const getScenicListAPI = () => {
-  return flaskRequest({
-    url: '/scenic/list',
-    method: 'get'
-  })
-}
-
 // 管理员一键爬取福州所有景区
 export const adminCrawlFuzhouAPI = (data) => {
   return flaskRequest({

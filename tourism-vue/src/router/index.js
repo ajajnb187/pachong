@@ -50,6 +50,12 @@ const router = createRouter({
           name: 'DataCrawler',
           component: () => import('@/views/DataCrawler.vue'),
           meta: { title: '数据爬取管理', icon: 'Connection' }
+        },
+        {
+          path: 'scenic-manage',
+          name: 'ScenicManage',
+          component: () => import('@/views/ScenicManage.vue'),
+          meta: { title: '景点数据管理', icon: 'Files' }
         }
       ]
     }

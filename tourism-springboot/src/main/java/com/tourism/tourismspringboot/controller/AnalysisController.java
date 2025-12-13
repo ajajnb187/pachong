@@ -69,7 +69,7 @@ public class AnalysisController {
     @Operation(summary = "季节性分析")
     @GetMapping("/season-pattern")
     public Result<Map<String, Object>> getSeasonPattern(
-            @Parameter(description = "景区ID") @RequestParam String spotId,
+            @Parameter(description = "景区ID（为空时分析福州全域）") @RequestParam(required = false) String spotId,
             @Parameter(description = "年份") @RequestParam Integer year) {
         Map<String, Object> pattern = scenicAnalysisService.getSeasonPattern(spotId, year);
         return Result.success(pattern);
@@ -111,7 +111,7 @@ public class AnalysisController {
     @Operation(summary = "建议游玩时间")
     @GetMapping("/recommend-visit-time")
     public Result<Map<String, Object>> getRecommendVisitTime(
-            @Parameter(description = "景区ID") @RequestParam String spotId) {
+            @Parameter(description = "景区ID（为空时分析福州全域）") @RequestParam(required = false) String spotId) {
         Map<String, Object> recommend = scenicAnalysisService.getRecommendVisitTime(spotId);
         return Result.success(recommend);
     }

@@ -20,6 +20,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 .addPathPatterns("/**")
                 .excludePathPatterns(
                         "/api/auth/login",           // 登录接口
+                        "/api/auth/logout",           // 登出接口
                         "/api/health/**",            // 健康检查
                         "/doc.html",                 // 接口文档
                         "/swagger-resources/**",

@@ -875,9 +875,23 @@ public class ScenicAnalysisServiceImpl implements IScenicAnalysisService {
 
             List<Map<String, Object>> locationData = hiveJdbcTemplate.queryForList(sql.toString(), params.toArray());
             
-            long totalVisitors = locationData.stream()
+            // 统计评论总数（用于计算百分比）
+            long totalReviewCount = locationData.stream()
                 .mapToLong(m -> ((Number) m.get("visitor_count")).longValue())
                 .sum();
+            
+            // 调用getTrafficAnalysis获取2025年真实总人流量
+            Map<String, Object> trafficData = getTrafficAnalysis(null, 2025);
+            long totalVisitors = 0;
+            if (trafficData != null && trafficData.containsKey("statistics")) {
+                Map<String, Object> statistics = (Map<String, Object>) trafficData.get("statistics");
+                if (statistics != null && statistics.containsKey("total_visitors")) {
+                    totalVisitors = ((Number) statistics.get("total_visitors")).longValue();
+                }
+            }
+            
+            // 如果无法获取总人流量，使用评论数作为兜底
+            final long finalTotalVisitors = totalVisitors > 0 ? totalVisitors : totalReviewCount;
 
             List<Map<String, Object>> provinceDistribution = locationData.stream()
                 .map(m -> {
@@ -889,10 +903,17 @@ public class ScenicAnalysisServiceImpl implements IScenicAnalysisService {
                     province.put("source_province", provinceName);
                     province.put("city", provinceName);
                     province.put("source_city", provinceName);
-                    province.put("visitor_count", m.get("visitor_count"));
-                    province.put("count", m.get("visitor_count"));
-                    long count = ((Number) m.get("visitor_count")).longValue();
-                    province.put("percentage", totalVisitors > 0 ? Math.round(count * 1000.0 / totalVisitors) / 10.0 : 0.0);
+                    
+                    // 计算百分比
+                    long reviewCount = ((Number) m.get("visitor_count")).longValue();
+                    double percentage = totalReviewCount > 0 ? Math.round(reviewCount * 1000.0 / totalReviewCount) / 10.0 : 0.0;
+                    province.put("percentage", percentage);
+                    
+                    // 真实游客数 = 百分比 × 总人流量
+                    long actualVisitorCount = Math.round(percentage / 100.0 * finalTotalVisitors);
+                    province.put("visitor_count", actualVisitorCount);
+                    province.put("count", actualVisitorCount);
+                    
                     return province;
                 }).collect(Collectors.toList());
             
@@ -903,12 +924,20 @@ public class ScenicAnalysisServiceImpl implements IScenicAnalysisService {
                     String cityName = locationName.replaceAll("省$", "").replaceAll("市$", "");
                     city.put("city", cityName);
                     city.put("source_city", cityName);
-                    city.put("visitor_count", m.get("visitor_count"));
-                    city.put("count", m.get("visitor_count"));
+                    
+                    // 计算百分比
+                    long reviewCount = ((Number) m.get("visitor_count")).longValue();
+                    double percentage = totalReviewCount > 0 ? Math.round(reviewCount * 1000.0 / totalReviewCount) / 10.0 : 0.0;
+                    
+                    // 真实游客数 = 百分比 × 总人流量
+                    long actualVisitorCount = Math.round(percentage / 100.0 * finalTotalVisitors);
+                    city.put("visitor_count", actualVisitorCount);
+                    city.put("count", actualVisitorCount);
+                    
                     return city;
                 }).collect(Collectors.toList());
 
-            result.put("totalVisitors", totalVisitors);
+            result.put("totalVisitors", finalTotalVisitors);
             result.put("provinceDistribution", provinceDistribution);
             result.put("cityDistribution", cityDistribution);
             

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 
 // 爬虫服务 - /api/crawler/* 路径
 const crawlerRequest = axios.create({
@@ -12,6 +13,27 @@ const flaskRequest = axios.create({
   baseURL: 'http://localhost:5000/api',
   timeout: 120000
 })
+
+// Spring Boot后端请求实例（用于缓存清除等操作）
+const springBootRequest = axios.create({
+  baseURL: 'http://localhost:8080/api',
+  timeout: 30000
+})
+
+// 为springBootRequest添加token请求拦截器
+springBootRequest.interceptors.request.use(
+  config => {
+    const userStore = useUserStore()
+    if (userStore.token) {
+      config.headers['satoken'] = userStore.token
+    }
+    return config
+  },
+  error => {
+    console.error('Spring Boot请求错误:', error)
+    return Promise.reject(error)
+  }
+)
 
 // 响应拦截器
 const responseInterceptor = (response) => {
@@ -31,6 +53,7 @@ const errorInterceptor = (error) => {
 
 crawlerRequest.interceptors.response.use(responseInterceptor, errorInterceptor)
 flaskRequest.interceptors.response.use(responseInterceptor, errorInterceptor)
+springBootRequest.interceptors.response.use(responseInterceptor, errorInterceptor)
 
 // 启动爬取任务
 export const startCrawlTaskAPI = (data) => {
@@ -97,5 +120,13 @@ export const getSystemStatusAPI = () => {
   return flaskRequest({
     url: '/system/status',
     method: 'get'
+  })
+}
+
+// 清除Spring Boot所有缓存（爬虫完成后调用）
+export const clearAllCacheAPI = () => {
+  return springBootRequest({
+    url: '/cache/clear-all',
+    method: 'delete'
   })
 }

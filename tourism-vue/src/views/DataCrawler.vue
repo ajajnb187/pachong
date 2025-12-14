@@ -272,13 +272,13 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  startCrawlTaskAPI,
   getTaskListAPI,
+  getDataSourceListAPI,
+  getSystemStatusAPI,
+  adminCrawlFuzhouAPI,
   stopTaskAPI,
   deleteTaskAPI,
-  getDataSourceListAPI,
-  adminCrawlFuzhouAPI,
-  getSystemStatusAPI
+  clearAllCacheAPI
 } from '@/api/crawler'
 
 const systemStats = ref([
@@ -311,6 +311,9 @@ const crawlLoading = ref(false)
 
 let refreshTimer = null
 
+// 记录上次任务状态，用于检测任务完成
+const previousTaskStates = ref(new Map())
+
 const fetchTaskList = async () => {
   tableLoading.value = true
   try {
@@ -321,6 +324,27 @@ const fetchTaskList = async () => {
     if (res.data) {
       taskList.value = res.data.tasks
       pagination.total = res.data.total
+      
+      // 检查是否有任务从运行中变为已完成，如果有则清除缓存
+      for (const task of taskList.value) {
+        const previousState = previousTaskStates.value.get(task.id)
+        const currentState = task.status
+        
+        // 如果任务从 running 变为 completed/success，调用缓存清除
+        if (previousState === 'running' && (currentState === 'completed' || currentState === 'success')) {
+          console.log(`任务 ${task.id} 已完成，清除缓存...`)
+          try {
+            await clearAllCacheAPI()
+            ElMessage.success('爬虫任务完成，缓存已清除')
+          } catch (error) {
+            console.error('清除缓存失败:', error)
+            ElMessage.warning('缓存清除失败，请手动刷新页面')
+          }
+        }
+        
+        // 更新状态记录
+        previousTaskStates.value.set(task.id, currentState)
+      }
     }
   } catch (error) {
     console.error('获取任务列表失败:', error)

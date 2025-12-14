@@ -162,10 +162,10 @@ def execute_crawl_fuzhou_complete(task_id, max_spots=50, reviews_per_spot=20):
         repair_hive_partitions()
         
         # 清理Redis缓存，确保新数据生效
+        # 注意：缓存清理由前端负责调用（后端需要token认证）
         logger.info("="*60)
-        logger.info("清理Redis缓存...")
+        logger.info("爬取任务完成，请前端调用缓存清理接口")
         logger.info("="*60)
-        clear_redis_cache()
         
         # 更新任务状态
         task.status = 'completed'
@@ -375,27 +375,5 @@ def repair_hive_partitions():
         return False
 
 
-def clear_redis_cache():
-    """
-    清理Spring Boot应用的Redis缓存
-    爬取完成后调用，确保新数据生效
-    """
-    import requests
-    
-    try:
-        # 调用Spring Boot的缓存清理API
-        spring_boot_url = 'http://localhost:8080/api/cache/clear-all'
-        
-        logger.info(f"正在清理Redis缓存: {spring_boot_url}")
-        response = requests.delete(spring_boot_url, timeout=10)
-        
-        if response.status_code == 200:
-            logger.info("✅ Redis缓存清理成功")
-            return True
-        else:
-            logger.warning(f"Redis缓存清理失败: HTTP {response.status_code}")
-            return False
-            
-    except Exception as e:
-        logger.warning(f"清理Redis缓存失败（可能Spring Boot未启动）: {str(e)}")
-        return False
+# 缓存清理已移除，改为由前端在爬虫完成后调用Spring Boot的缓存清理接口
+# 前端应调用：DELETE /api/cache/clear-all

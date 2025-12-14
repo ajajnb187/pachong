@@ -870,6 +870,7 @@ public class ScenicAnalysisServiceImpl implements IScenicAnalysisService {
             }
 
             sql.append("GROUP BY ip_location ");
+            sql.append("ORDER BY visitor_count DESC ");
             sql.append("LIMIT 100");
 
             List<Map<String, Object>> locationData = hiveJdbcTemplate.queryForList(sql.toString(), params.toArray());

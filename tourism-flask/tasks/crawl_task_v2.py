@@ -387,7 +387,7 @@ def clear_redis_cache():
         spring_boot_url = 'http://localhost:8080/api/cache/clear-all'
         
         logger.info(f"正在清理Redis缓存: {spring_boot_url}")
-        response = requests.post(spring_boot_url, timeout=10)
+        response = requests.delete(spring_boot_url, timeout=10)
         
         if response.status_code == 200:
             logger.info("✅ Redis缓存清理成功")

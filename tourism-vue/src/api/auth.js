@@ -21,3 +21,11 @@ export const logoutAPI = () => {
     method: 'POST'
   })
 }
+
+export const updateUserInfoAPI = (data) => {
+  return request({
+    url: '/auth/update',
+    method: 'PUT',
+    data
+  })
+}

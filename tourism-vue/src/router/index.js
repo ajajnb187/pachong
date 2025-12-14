@@ -37,13 +37,7 @@ const router = createRouter({
           path: 'season-analysis',
           name: 'SeasonAnalysis',
           component: () => import('@/views/SeasonalAnalysis.vue'),
-          meta: { title: '季节性分析', icon: 'Sunny' }
-        },
-        {
-          path: 'scenic-detail/:id',
-          name: 'ScenicDetail',
-          component: () => import('@/views/ScenicDetail.vue'),
-          meta: { title: '景区详情', icon: 'Location', hidden: true }
+          meta: { title: '人流量分析', icon: 'Sunny' }
         },
         {
           path: 'data-crawler',
@@ -68,6 +62,12 @@ const router = createRouter({
           name: 'CacheManage',
           component: () => import('@/views/CacheManage.vue'),
           meta: { title: '缓存管理', icon: 'Coin' }
+        },
+        {
+          path: 'profile',
+          name: 'UserProfile',
+          component: () => import('@/views/UserProfile.vue'),
+          meta: { title: '账号信息', icon: 'User', hidden: true }
         }
       ]
     }

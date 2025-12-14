@@ -3,12 +3,16 @@
 """
 import os
 import json
+import threading
 from datetime import datetime
 from models.database import SessionLocal
 from models.task import CrawlerTask
 from crawlers.ctrip_crawler_v2 import CtripCrawlerV2
 from utils.logger import logger
 from config import Config
+
+# 全局字典，存储正在运行的任务停止事件
+running_tasks = {}
 
 def execute_crawl_fuzhou_complete(task_id, max_spots=50, reviews_per_spot=20):
     """
@@ -28,12 +32,16 @@ def execute_crawl_fuzhou_complete(task_id, max_spots=50, reviews_per_spot=20):
     """
     db = SessionLocal()
     task = None
+    stop_event = threading.Event()
     
     try:
         task = db.query(CrawlerTask).filter(CrawlerTask.id == task_id).first()
         if not task:
             logger.error(f"任务不存在: {task_id}")
             return
+        
+        # 注册停止事件
+        running_tasks[task_id] = stop_event
         
         # 更新任务状态为运行中
         task.status = 'running'
@@ -82,6 +90,11 @@ def execute_crawl_fuzhou_complete(task_id, max_spots=50, reviews_per_spot=20):
         crawled_count = 0
         
         for idx, spot_info in enumerate(all_spots, 1):
+            # 检查是否收到停止信号
+            if stop_event.is_set():
+                logger.warning(f"任务{task_id}收到停止信号，停止爬取")
+                raise Exception("任务被用户手动停止")
+            
             spot_id = spot_info.get('_spot_id')
             spot_name = spot_info.get('scenic_spot')
             
@@ -95,7 +108,8 @@ def execute_crawl_fuzhou_complete(task_id, max_spots=50, reviews_per_spot=20):
                 reviews = crawler.crawl_reviews_for_spot(
                     spot_id, 
                     spot_name, 
-                    max_reviews=reviews_per_spot
+                    max_reviews=reviews_per_spot,
+                    stop_event=stop_event
                 )
                 
                 if reviews:
@@ -169,12 +183,38 @@ def execute_crawl_fuzhou_complete(task_id, max_spots=50, reviews_per_spot=20):
     except Exception as e:
         logger.error(f"任务执行失败: {str(e)}", exc_info=True)
         if task:
-            task.status = 'failed'
+            # 判断是否是手动停止
+            if "手动停止" in str(e):
+                task.status = 'stopped'
+            else:
+                task.status = 'failed'
             task.error_msg = str(e)
             task.end_time = datetime.now()
             db.commit()
     finally:
+        # 清理停止事件
+        if task_id in running_tasks:
+            del running_tasks[task_id]
         db.close()
+
+
+def stop_task(task_id):
+    """
+    停止正在运行的任务
+    
+    Args:
+        task_id: 任务ID
+    
+    Returns:
+        bool: 是否成功发送停止信号
+    """
+    if task_id in running_tasks:
+        logger.info(f"发送停止信号给任务: {task_id}")
+        running_tasks[task_id].set()
+        return True
+    else:
+        logger.warning(f"任务{task_id}不在运行中，无法停止")
+        return False
 
 
 def save_spots_to_file(spots_data, task_id):

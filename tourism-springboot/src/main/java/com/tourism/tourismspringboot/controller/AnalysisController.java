@@ -99,6 +99,14 @@ public class AnalysisController {
         Map<String, Object> demographics = scenicAnalysisService.getVisitorDemographics(spotId, null, null);
         return Result.success(demographics);
     }
+    
+    @Operation(summary = "评分分布统计")
+    @GetMapping("/rating-distribution")
+    public Result<Map<String, Object>> getRatingDistribution(
+            @Parameter(description = "景区ID（为空时统计全域）") @RequestParam(required = false) String spotId) {
+        Map<String, Object> distribution = scenicAnalysisService.getRatingDistribution(spotId);
+        return Result.success(distribution);
+    }
 
     @Operation(summary = "打分人数统计")
     @GetMapping("/review-user-count")
@@ -114,5 +122,23 @@ public class AnalysisController {
             @Parameter(description = "景区ID（为空时分析福州全域）") @RequestParam(required = false) String spotId) {
         Map<String, Object> recommend = scenicAnalysisService.getRecommendVisitTime(spotId);
         return Result.success(recommend);
+    }
+    
+    @Operation(summary = "人流量分析")
+    @GetMapping("/traffic-analysis")
+    public Result<Map<String, Object>> getTrafficAnalysis(
+            @Parameter(description = "景区ID（为空时分析福州全域）") @RequestParam(required = false) String spotId,
+            @Parameter(description = "年份") @RequestParam(required = false) Integer year) {
+        Map<String, Object> analysis = scenicAnalysisService.getTrafficAnalysis(spotId, year);
+        return Result.success(analysis);
+    }
+    
+    @Operation(summary = "人流量预测")
+    @GetMapping("/traffic-forecast")
+    public Result<Map<String, Object>> getTrafficForecast(
+            @Parameter(description = "景区ID（为空时预测福州全域）") @RequestParam(required = false) String spotId,
+            @Parameter(description = "预测未来几个月", example = "12") @RequestParam(required = false, defaultValue = "12") Integer monthsAhead) {
+        Map<String, Object> forecast = scenicAnalysisService.getTrafficForecast(spotId, monthsAhead);
+        return Result.success(forecast);
     }
 }

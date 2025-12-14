@@ -31,7 +31,7 @@
       </el-col>
     </el-row>
 
-    <!-- 底部行：人口画像 & 核心指标 -->
+<!--    &lt;!&ndash; 底部行：人口画像 & 核心指标 &ndash;&gt;
     <el-row :gutter="24" class="bottom-row">
       <el-col :xs="24" :lg="16">
         <div class="tech-panel chart-panel">
@@ -41,7 +41,7 @@
             <div class="header-line"></div>
           </div>
           <div ref="demographicChartRef" class="chart-box"></div>
-          <!-- 装饰角标 -->
+          &lt;!&ndash; 装饰角标 &ndash;&gt;
           <i class="corner t-l"></i><i class="corner t-r"></i>
           <i class="corner b-l"></i><i class="corner b-r"></i>
         </div>
@@ -77,23 +77,19 @@
             </div>
 
             <div class="stat-card secondary-glow">
-              <div class="label">游客平均年龄</div>
-              <div class="value-group">
-                <span class="value num-font">{{ avgAge }}</span>
-                <span class="unit">岁</span>
-              </div>
-              <div class="age-icon">
-                <div class="icon-circle"></div>
+              <div class="label">数据说明</div>
+              <div class="info-text">
+                当前分析基于评论IP属地数据，不包含年龄性别等人口学特征
               </div>
             </div>
           </div>
 
-          <!-- 装饰角标 -->
+          &lt;!&ndash; 装饰角标 &ndash;&gt;
           <i class="corner t-l"></i><i class="corner t-r"></i>
           <i class="corner b-l"></i><i class="corner b-r"></i>
         </div>
       </el-col>
-    </el-row>
+    </el-row>-->
   </div>
 </template>
 

@@ -7,7 +7,7 @@
       <el-form :inline="true" :model="queryParams" class="tech-form">
 
 
-        <el-form-item label="时间维度 / Year">
+<!--        <el-form-item label="时间维度 / Year">
           <el-date-picker
               v-model="queryParams.year"
               type="year"
@@ -18,7 +18,7 @@
               class="tech-date"
               :clearable="false"
           />
-        </el-form-item>
+        </el-form-item>-->
       </el-form>
 
       <div class="console-decoration right"></div>
@@ -26,13 +26,13 @@
 
     <!-- 数据图表区 -->
     <el-row :gutter="24" class="chart-section">
-      <!-- 左侧：月度趋势图 -->
+      <!-- 左侧：历史人流量分析 -->
       <el-col :xs="24" :lg="16">
         <div class="tech-panel chart-panel">
           <div class="panel-header">
             <div class="header-title">
               <el-icon class="icon"><TrendCharts /></el-icon>
-              <span class="title">月度客流波动趋势</span>
+              <span class="title">历史人流量分析</span>
             </div>
             <div class="header-tag">{{ currentTargetName }}</div>
           </div>
@@ -43,16 +43,16 @@
         </div>
       </el-col>
 
-      <!-- 右侧：季节分布饼图 -->
+      <!-- 右侧：未来人流量预测 -->
       <el-col :xs="24" :lg="8">
         <div class="tech-panel chart-panel">
           <div class="panel-header">
             <div class="header-title">
               <el-icon class="icon"><Histogram /></el-icon>
-              <span class="title">季节性客流占比</span>
+              <span class="title">未来人流量预测</span>
             </div>
           </div>
-          <div ref="seasonChartRef" class="chart-box"></div>
+          <div ref="forecastChartRef" class="chart-box"></div>
           <!-- 装饰角标 -->
           <i class="corner t-l"></i><i class="corner t-r"></i>
           <i class="corner b-l"></i><i class="corner b-r"></i>
@@ -138,7 +138,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
-import { getSeasonPatternAPI, getRecommendVisitTimeAPI, getScenicListAPI } from '@/api/analysis'
+import { getTrafficAnalysisAPI, getTrafficForecastAPI, getScenicListAPI, getRecommendVisitTimeAPI } from '@/api/analysis'
 import { TrendCharts, Histogram, Calendar, Star } from '@element-plus/icons-vue'
 
 // --- 状态定义 ---
@@ -149,13 +149,13 @@ const queryParams = reactive({
 })
 
 const scenicList = ref([])
-const seasonData = ref([])
+const trafficData = ref(null)
+const forecastData = ref(null)
 const recommendData = ref(null)
 const monthlyChartRef = ref(null)
-const seasonChartRef = ref(null)
-
+const forecastChartRef = ref(null)
 let monthlyChart = null
-let seasonChart = null
+let forecastChart = null
 
 // 计算属性：当前显示的标题
 const currentTargetName = computed(() => {
@@ -165,7 +165,6 @@ const currentTargetName = computed(() => {
 })
 
 // --- API 调用 ---
-
 // 1. 获取景区列表
 const fetchScenicList = async () => {
   try {
@@ -193,26 +192,32 @@ const fetchData = async () => {
       year: parseInt(queryParams.year)
     }
 
-    const [seasonRes, recommendRes] = await Promise.all([
-      getSeasonPatternAPI(requestParams),
+    const [trafficRes, forecastRes, recommendRes] = await Promise.all([
+      getTrafficAnalysisAPI(requestParams),
+      getTrafficForecastAPI({ spotId: queryParams.spotId || undefined, monthsAhead: 12 }),
       getRecommendVisitTimeAPI({ spotId: queryParams.spotId || undefined })
     ])
 
-    // 处理图表数据
-    if (seasonRes.data) {
-      // 兼容后端返回结构
-      seasonData.value = seasonRes.data.monthlyStats || seasonRes.data || []
+    // 处理历史人流量数据
+    if (trafficRes.data && trafficRes.data.monthly_traffic) {
+      trafficData.value = trafficRes.data
       nextTick(() => {
         initMonthlyChart()
-        initSeasonChart()
+      })
+    }
+    
+    // 处理预测数据
+    if (forecastRes.data) {
+      forecastData.value = forecastRes.data
+      nextTick(() => {
+        initForecastChart()
       })
     }
 
-    // 处理推荐数据
-    if (recommendRes.data) {
-      recommendData.value = recommendRes.data
+    // 前端智能推荐算法：基于福州气候特点和人流量数据
+    if (trafficRes.data && trafficRes.data.monthly_traffic) {
+      recommendData.value = calculateSmartRecommendation(trafficRes.data.monthly_traffic, forecastRes.data)
     } else {
-      // 兜底空数据防止报错
       recommendData.value = {
         bestVisitTime: '数据不足',
         recommendedMonths: [],
@@ -238,6 +243,176 @@ const formatNumber = (num) => {
   return num.toLocaleString('zh-CN')
 }
 
+/**
+ * 福州气候舒适度评分（基于实际气候数据）
+ * 参考：福州旅游最佳时间建议
+ * 最佳季节：秋季(10-11月)、冬季(12-2月)
+ * 淡季：春季(3-4月阴雨)、梅雨期(5-6月)、夏季(7-8月高温台风)
+ */
+const getFuzhouClimateScore = (month) => {
+  const climateScores = {
+    1: 85,  // 冬季，温暖舒适
+    2: 85,  // 冬季，阳光明媚
+    3: 60,  // 春季，阴雨绵绵
+    4: 65,  // 春季，冷暖变化大
+    5: 50,  // 梅雨期，暴雨频繁
+    6: 45,  // 梅雨期，降水最多
+    7: 40,  // 夏季，高温台风
+    8: 40,  // 夏季，极端天气
+    9: 80,  // 初秋，开始舒适
+    10: 95, // 秋季黄金期，气候宜人
+    11: 95, // 秋季黄金期，天高云淡
+    12: 85  // 冬季，温和干燥
+  }
+  return climateScores[month] || 60
+}
+
+/**
+ * 获取月份名称
+ */
+const getMonthName = (month) => {
+  return `${month}月`
+}
+
+/**
+ * 获取季节类型
+ */
+const getSeasonType = (month) => {
+  if (month >= 3 && month <= 5) return '春季'
+  if (month >= 6 && month <= 8) return '夏季'
+  if (month >= 9 && month <= 11) return '秋季'
+  return '冬季'
+}
+
+/**
+ * 智能推荐算法：综合评分模型
+ * 评分维度：
+ * 1. 人流拥挤度评分（30%）- 人流越少得分越高
+ * 2. 游客满意度评分（30%）- 评分越高得分越高  
+ * 3. 气候舒适度评分（30%）- 基于福州实际气候特点
+ * 4. 未来趋势评分（10%）- 预测人流增长趋势
+ */
+const calculateSmartRecommendation = (monthlyTraffic, forecastData) => {
+  if (!monthlyTraffic || monthlyTraffic.length === 0) {
+    return {
+      bestVisitTime: '数据不足',
+      recommendedMonths: [],
+      peakMonths: [],
+      offPeakMonths: []
+    }
+  }
+
+  // 1. 计算统计值
+  const visitors = monthlyTraffic.map(m => m.visitor_count)
+  const maxVisitors = Math.max(...visitors)
+  const minVisitors = Math.min(...visitors)
+  const avgVisitors = visitors.reduce((a, b) => a + b, 0) / visitors.length
+
+  // 2. 提取预测数据
+  const forecastMap = {}
+  if (forecastData && forecastData.forecast) {
+    forecastData.forecast.forEach(f => {
+      if (f.month && f.predicted_visitors) {
+        const monthNum = parseInt(f.month.split('-')[1])
+        forecastMap[monthNum] = f.predicted_visitors
+      }
+    })
+  }
+
+  // 3. 为每个月计算综合评分
+  const monthScores = monthlyTraffic.map(data => {
+    const month = parseInt(data.month.split('-')[1])
+    const visitorCount = data.visitor_count
+    const avgRating = data.avg_rating || 4.5
+
+    // 3.1 人流拥挤度评分（越少越好）
+    let crowdScore = 0
+    if (maxVisitors > minVisitors) {
+      crowdScore = 100 * (1 - (visitorCount - minVisitors) / (maxVisitors - minVisitors))
+    }
+
+    // 3.2 游客满意度评分
+    const satisfactionScore = (avgRating / 5.0) * 100
+
+    // 3.3 福州气候舒适度评分
+    const climateScore = getFuzhouClimateScore(month)
+
+    // 3.4 未来趋势评分
+    let trendScore = 50
+    if (forecastMap[month]) {
+      const predictedVisitors = forecastMap[month]
+      const growthRate = (predictedVisitors - visitorCount) / visitorCount
+      if (growthRate < -0.05) {
+        trendScore = 100 // 人流下降，最佳
+      } else if (growthRate < 0.1) {
+        trendScore = 80  // 小幅增长
+      } else if (growthRate < 0.3) {
+        trendScore = 60  // 中等增长
+      } else {
+        trendScore = 40  // 大幅增长，拥挤
+      }
+    }
+
+    // 3.5 综合评分（加权）
+    const totalScore = crowdScore * 0.3 + satisfactionScore * 0.3 + 
+                      climateScore * 0.3 + trendScore * 0.1
+
+    // 3.6 拥挤等级判断
+    let crowdLevel
+    if (visitorCount < avgVisitors * 0.7) {
+      crowdLevel = '舒适'
+    } else if (visitorCount < avgVisitors * 1.3) {
+      crowdLevel = '适中'
+    } else {
+      crowdLevel = '拥挤'
+    }
+
+    return {
+      month: month,
+      monthName: getMonthName(month),
+      visitorCount: visitorCount,
+      avgRating: Math.round(avgRating * 10) / 10,
+      crowdLevel: crowdLevel,
+      seasonType: getSeasonType(month),
+      totalScore: Math.round(totalScore * 10) / 10,
+      crowdScore: Math.round(crowdScore * 10) / 10,
+      satisfactionScore: Math.round(satisfactionScore * 10) / 10,
+      climateScore: climateScore,
+      trendScore: Math.round(trendScore * 10) / 10,
+      predictedVisitors: forecastMap[month]
+    }
+  })
+
+  // 4. 排序并筛选推荐月份（综合得分前6名）
+  const sortedMonths = [...monthScores].sort((a, b) => b.totalScore - a.totalScore)
+  const recommendedMonths = sortedMonths.slice(0, 6)
+
+  // 5. 识别高峰期（客流量 > 平均值 * 1.5）
+  const peakMonthsData = monthScores.filter(m => m.visitorCount > avgVisitors * 1.5)
+  const peakMonths = peakMonthsData.map(m => m.monthName)
+
+  // 6. 识别错峰期（客流量 < 平均值 * 0.7 且气候舒适度 >= 70）
+  const offPeakMonthsData = monthScores.filter(m => 
+    m.visitorCount < avgVisitors * 0.7 && m.climateScore >= 70
+  )
+  const offPeakMonths = offPeakMonthsData.map(m => m.monthName)
+
+  // 7. 确定最佳游玩时间（综合评分最高的月份）
+  const bestMonth = sortedMonths[0]
+  const bestVisitTime = bestMonth ? bestMonth.monthName : '10-11月（秋季）'
+
+  return {
+    bestVisitTime: bestVisitTime,
+    recommendedMonths: recommendedMonths,
+    peakMonths: peakMonths,
+    offPeakMonths: offPeakMonths,
+    peakMonthsDetail: peakMonthsData,
+    offPeakMonthsDetail: offPeakMonthsData,
+    avgVisitors: Math.round(avgVisitors),
+    algorithmVersion: '前端智能推荐v1.0 - 基于福州气候特点'
+  }
+}
+
 // --- ECharts 配置 (暗黑科技风) ---
 const commonChartConfig = {
   backgroundColor: 'transparent',
@@ -252,13 +427,13 @@ const commonChartConfig = {
 }
 
 const initMonthlyChart = () => {
-  if (!monthlyChartRef.value) return
+  if (!monthlyChartRef.value || !trafficData.value) return
   if (monthlyChart) monthlyChart.dispose()
 
   monthlyChart = echarts.init(monthlyChartRef.value)
 
-  const months = seasonData.value.map(item => `${item.month}月`)
-  const visitors = seasonData.value.map(item => item.visitorCount || item.visitor_count || 0)
+  const months = trafficData.value.monthly_traffic.map(item => item.month)
+  const visitors = trafficData.value.monthly_traffic.map(item => item.visitor_count)
 
   const option = {
     ...commonChartConfig,
@@ -297,47 +472,50 @@ const initMonthlyChart = () => {
   monthlyChart.setOption(option)
 }
 
-const initSeasonChart = () => {
-  if (!seasonChartRef.value) return
-  if (seasonChart) seasonChart.dispose()
+const initForecastChart = () => {
+  if (!forecastChartRef.value || !forecastData.value) return
+  if (forecastChart) forecastChart.dispose()
 
-  seasonChart = echarts.init(seasonChartRef.value)
+  forecastChart = echarts.init(forecastChartRef.value)
 
-  // 聚合季节数据
-  const seasonMap = { '春季': 0, '夏季': 0, '秋季': 0, '冬季': 0 }
-  seasonData.value.forEach(item => {
-    // 兼容后端字段可能的大小写或下划线
-    const season = item.seasonType || item.season_type
-    const count = item.visitorCount || item.visitor_count || 0
-    if (seasonMap.hasOwnProperty(season)) {
-      seasonMap[season] += count
-    }
-  })
+  const months = forecastData.value.forecast.map(item => item.month)
+  const predictedVisitors = forecastData.value.forecast.map(item => item.predicted_visitors)
 
   const option = {
     ...commonChartConfig,
-    tooltip: { trigger: 'item', formatter: '{b}: {c}人 ({d}%)' },
-    legend: { bottom: '0', textStyle: { color: '#fff' }, icon: 'circle' },
+    xAxis: {
+      type: 'category',
+      data: months,
+      boundaryGap: false,
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+      axisLabel: { color: '#8fb6e6', rotate: 30 },
+      axisTick: { show: false }
+    },
+    yAxis: {
+      type: 'value',
+      name: '预测游客量',
+      nameTextStyle: { color: '#8fb6e6', padding: [0, 0, 0, 20] },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)', type: 'dashed' } },
+      axisLabel: { color: '#8fb6e6' }
+    },
     series: [{
-      name: '季节分布',
-      type: 'pie',
-      radius: ['45%', '70%'],
-      center: ['50%', '45%'],
-      itemStyle: {
-        borderRadius: 4,
-        borderColor: '#0b1531',
-        borderWidth: 2
-      },
-      label: { show: false },
-      data: [
-        { value: seasonMap['春季'], name: '春季', itemStyle: { color: '#43e97b' } },
-        { value: seasonMap['夏季'], name: '夏季', itemStyle: { color: '#f5576c' } },
-        { value: seasonMap['秋季'], name: '秋季', itemStyle: { color: '#f093fb' } },
-        { value: seasonMap['冬季'], name: '冬季', itemStyle: { color: '#4facfe' } }
-      ]
+      name: '预测游客量',
+      type: 'line',
+      data: predictedVisitors,
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      itemStyle: { color: '#f093fb', borderColor: '#fff', borderWidth: 2 },
+      lineStyle: { width: 3, color: '#f093fb', shadowColor: 'rgba(240,147,251,0.5)', shadowBlur: 10, type: 'dashed' },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(240, 147, 251, 0.4)' },
+          { offset: 1, color: 'rgba(240, 147, 251, 0.05)' }
+        ])
+      }
     }]
   }
-  seasonChart.setOption(option)
+  forecastChart.setOption(option)
 }
 
 const getCrowdClass = (level) => {
@@ -347,7 +525,7 @@ const getCrowdClass = (level) => {
 
 const handleResize = () => {
   monthlyChart?.resize()
-  seasonChart?.resize()
+  forecastChart?.resize()
 }
 
 onMounted(async () => {
@@ -359,7 +537,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
   monthlyChart?.dispose()
-  seasonChart?.dispose()
+  forecastChart?.dispose()
 })
 </script>
 

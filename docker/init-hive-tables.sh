@@ -33,6 +33,8 @@ CREATE EXTERNAL TABLE IF NOT EXISTS fuzhou_reviews (
     review_content STRING,
     travel_date STRING,
     review_date STRING,
+    visitor_location STRING,
+    ip_location STRING,
     data_source STRING,
     crawl_time STRING
 )

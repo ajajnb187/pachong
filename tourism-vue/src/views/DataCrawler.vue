@@ -82,21 +82,27 @@
                   />
                 </template>
               </el-table-column>
-<!--              <el-table-column label="指令控制" width="180" fixed="right" align="right">
+              <el-table-column label="指令控制" width="180" fixed="right" align="right">
                 <template #default="{ row }">
                   <div class="action-group">
                     <el-tooltip content="停止" v-if="row.status === 'running'">
-                      <span class="action-icon warning" @click="handleStopTask(row.id)"><VideoPause /></span>
+                      <span class="action-icon warning" @click="handleStopTask(row.id)">
+                        <el-icon><VideoPause /></el-icon>
+                      </span>
                     </el-tooltip>
                     <el-tooltip content="查看详情">
-                      <span class="action-icon info" @click="handleViewTask(row)"><View /></span>
+                      <span class="action-icon info" @click="handleViewTask(row)">
+                        <el-icon><View /></el-icon>
+                      </span>
                     </el-tooltip>
                     <el-tooltip content="删除记录" v-if="row.status !== 'running'">
-                      <span class="action-icon danger" @click="handleDeleteTask(row.id)"><Delete /></span>
+                      <span class="action-icon danger" @click="handleDeleteTask(row.id)">
+                        <el-icon><Delete /></el-icon>
+                      </span>
                     </el-tooltip>
                   </div>
                 </template>
-              </el-table-column>-->
+              </el-table-column>
             </el-table>
 
             <div class="pagination-wrapper">
@@ -138,24 +144,30 @@
                   <el-form-item label="景点数量 / Max Spots" v-if="crawlForm.mode === 'custom'">
                     <el-input-number
                         v-model="crawlForm.maxSpots"
-                        :min="5"
-                        :max="500"
-                        :step="5"
+                        :min="1"
+                        :step="10"
                         style="width: 100%"
                         class="tech-number-input"
+                        controls-position="right"
                     />
-                    <span class="input-hint">爬取几个景点</span>
+                    <span class="input-hint">爬取几个景点（不限制最大值）</span>
                   </el-form-item>
-                  <el-form-item label="每景点评论数 / Reviews Per Spot" v-if="crawlForm.mode === 'custom'">
+                  <el-form-item label="评论数量模式 / Review Mode" v-if="crawlForm.mode === 'custom'">
+                    <el-radio-group v-model="crawlForm.reviewMode" class="crawl-radio-group">
+                      <el-radio-button label="custom">指定数量</el-radio-button>
+                      <el-radio-button label="all">全部评论</el-radio-button>
+                    </el-radio-group>
+                  </el-form-item>
+                  <el-form-item label="每景点评论数 / Reviews Per Spot" v-if="crawlForm.mode === 'custom' && crawlForm.reviewMode === 'custom'">
                     <el-input-number
                         v-model="crawlForm.reviewsPerSpot"
-                        :min="5"
-                        :max="200"
-                        :step="5"
+                        :min="1"
+                        :step="10"
                         style="width: 100%"
                         class="tech-number-input"
+                        controls-position="right"
                     />
-                    <span class="input-hint">每个景点爬取几条评论</span>
+                    <span class="input-hint">每个景点爬取几条评论（不限制最大值）</span>
                   </el-form-item>
                   <el-form-item v-if="crawlForm.mode === 'full'">
                     <el-alert type="info" :closable="false" show-icon>
@@ -291,6 +303,7 @@ const pagination = reactive({
 const crawlForm = reactive({
   mode: 'custom',
   maxSpots: 50,
+  reviewMode: 'custom',
   reviewsPerSpot: 20
 })
 
@@ -342,12 +355,18 @@ const fetchSystemStatus = async () => {
 }
 
 const handleStartCrawl = async () => {
-  const params = crawlForm.mode === 'full' 
-    ? { crawl_mode: 'full', max_spots: -1, reviews_per_spot: -1 }
-    : { max_spots: crawlForm.maxSpots, reviews_per_spot: crawlForm.reviewsPerSpot }
+  let params, totalEstimate, modeText
   
-  const totalEstimate = crawlForm.mode === 'full' ? '全部' : (params.max_spots * params.reviews_per_spot)
-  const modeText = crawlForm.mode === 'full' ? '全量爬取（所有景点和评论）' : `${params.max_spots}个景点 x ${params.reviews_per_spot}条评论`
+  if (crawlForm.mode === 'full') {
+    params = { crawl_mode: 'full', max_spots: -1, reviews_per_spot: -1 }
+    totalEstimate = '全部'
+    modeText = '全量爬取（所有景点和评论）'
+  } else {
+    const reviewsPerSpot = crawlForm.reviewMode === 'all' ? -1 : crawlForm.reviewsPerSpot
+    params = { max_spots: crawlForm.maxSpots, reviews_per_spot: reviewsPerSpot }
+    totalEstimate = crawlForm.reviewMode === 'all' ? `${crawlForm.maxSpots}个景点 x 全部评论` : `约${params.max_spots * params.reviews_per_spot}条`
+    modeText = crawlForm.reviewMode === 'all' ? `${crawlForm.maxSpots}个景点 x 全部评论` : `${params.max_spots}个景点 x ${params.reviews_per_spot}条评论`
+  }
   
   ElMessageBox.confirm(
       `确定要开始爬取吗？\n模式: ${modeText}\n预计数据量: 约${totalEstimate}条\n数据将自动存入Hadoop HDFS`,
@@ -418,6 +437,7 @@ const getStatusText = (status) => {
     pending: '等待中',
     running: '采集运行中',
     success: '已完成',
+    completed: '已完成',
     failed: '异常终止',
     stopped: '手动停止'
   }
@@ -737,12 +757,16 @@ $text-sub: #8fb6e6;
     gap: 12px;
 
     .action-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      font-size: 16px;
+      font-size: 18px;
+      padding: 4px;
       transition: all 0.3s;
-      &.warning { color: #e6a23c; &:hover { text-shadow: 0 0 10px #e6a23c; } }
-      &.info { color: $primary; &:hover { text-shadow: 0 0 10px $primary; } }
-      &.danger { color: #ff4d4f; &:hover { text-shadow: 0 0 10px #ff4d4f; } }
+      &.warning { color: #e6a23c; &:hover { color: #f0c040; transform: scale(1.2); } }
+      &.info { color: $primary; &:hover { color: #4facfe; transform: scale(1.2); } }
+      &.danger { color: #ff4d4f; &:hover { color: #ff6b6b; transform: scale(1.2); } }
     }
   }
 }

@@ -69,8 +69,7 @@
                 :key="index"
                 class="rank-item"
                 :class="{ 'top-3': index < 3 }"
-                @click="handleItemClick(item)"
-            >
+               >
               <!-- 排名徽章 -->
               <div class="rank-num-wrapper">
                 <div class="rank-num" :class="`rank-${index + 1}`">
@@ -98,11 +97,11 @@
                     />
                   </template>
                   <template v-else-if="queryParams.rankType === 'visitor'">
-                    <span class="data-value num-font">{{ (item.visitor_count || item.total_visitors).toLocaleString() }}</span>
+                    <span class="data-value num-font">{{ ((item.visitor_count || item.total_visitors || 0)).toLocaleString() }}</span>
                     <span class="data-unit">人次</span>
                   </template>
                   <template v-else>
-                    <span class="data-value num-font">{{ (item.review_count || item.total_reviews).toLocaleString() }}</span>
+                    <span class="data-value num-font">{{ ((item.review_count || item.total_reviews || 0)).toLocaleString() }}</span>
                     <span class="data-unit">条</span>
                   </template>
                 </div>
@@ -125,7 +124,7 @@
 import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
-import { getScenicRankingAPI } from '@/api/analysis'
+import { getScenicRankingAPI, getTrafficAnalysisAPI } from '@/api/analysis'
 import { TrendCharts, Trophy } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -145,16 +144,52 @@ const rankingData = ref([])
 const barChartRef = ref(null)
 let barChart = null
 
-// API调用保持不变
+// 获取单个景点的人流量分析（基于评论转换率）
+const fetchVisitorCount = async (spotName) => {
+  try {
+    const currentYear = new Date().getFullYear()
+    const res = await getTrafficAnalysisAPI({ spotId: spotName, year: currentYear })
+    if (res.data && res.data.statistics) {
+      return res.data.statistics.total_visitors || 0
+    }
+    return 0
+  } catch (error) {
+    console.warn(`获取${spotName}人流量失败:`, error)
+    return 0
+  }
+}
+
+// API调用
 const fetchRanking = async () => {
   try {
     const res = await getScenicRankingAPI(queryParams)
     if (res.data) {
-      rankingData.value = res.data.map(item => ({
+      let mappedData = res.data.map(item => ({
         ...item,
         displayRating: parseFloat(item.avg_rating || item.rating || 0)
       }))
-      // 确保DOM更新后再渲染图表
+      
+      // 如果是游客流量排行，调用人流量分析API
+      if (queryParams.rankType === 'visitor') {
+        const visitorCounts = await Promise.all(
+          mappedData.map(item => 
+            fetchVisitorCount(item.scenic_spot || item.spot_name)
+          )
+        )
+        
+        mappedData = mappedData.map((item, index) => ({
+          ...item,
+          visitor_count: visitorCounts[index],
+          total_visitors: visitorCounts[index]
+        }))
+        
+        mappedData.sort((a, b) => 
+          (b.visitor_count || 0) - (a.visitor_count || 0)
+        )
+      }
+      
+      rankingData.value = mappedData
+      
       nextTick(() => {
         initBarChart()
       })
@@ -263,12 +298,7 @@ const initBarChart = () => {
   barChart.setOption(option)
 }
 
-const handleItemClick = (item) => {
-  router.push({
-    path: '/scenic-detail',
-    query: { spot: item.scenic_spot || item.spot_name }
-  })
-}
+
 
 const handleResize = () => {
   barChart?.resize()

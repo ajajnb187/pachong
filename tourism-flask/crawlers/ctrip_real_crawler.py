@@ -239,6 +239,11 @@ class CtripRealCrawler:
                         user_level = user_info.get('userLevel', '')
                         user_location = user_info.get('userProvince', '')
                         
+                        # 提取IP属地
+                        ip_location = item.get('ipLocatedName', '')
+                        if not ip_location:
+                            ip_location = user_location  # 回退到用户省份
+                        
                         # 提取评分
                         rating = float(item.get('score', 5.0))
                         
@@ -298,6 +303,7 @@ class CtripRealCrawler:
                             'helpful_count': helpful_count,
                             'visitor_level': user_level,
                             'visitor_location': user_location,
+                            'ip_location': ip_location,  # IP属地
                             'data_source': 'ctrip',
                             'crawl_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                         }

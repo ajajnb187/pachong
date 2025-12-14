@@ -76,8 +76,14 @@ echo - 一键部署指南.md (完整部署和使用说明)
 echo - 使用说明.md (详细操作文档)
 echo.
 echo 重要提示：
-echo - Hive表已创建但无数据，需要运行Flask爬虫上传数据
+echo - Hive表和VIEW视图已自动创建完成
+echo - 评论表已使用正确的JsonSerDe配置
+echo - 需要运行Flask爬虫上传数据到HDFS
 echo - 启动Flask: cd tourism-flask, python app.py
 echo - 启动SpringBoot: cd tourism-springboot, mvn spring-boot:run
+echo.
+echo 验证Hive环境（可选）：
+echo docker exec hive-server beeline -u "jdbc:hive2://localhost:10000" -e "SHOW TABLES IN tourism_db"
+echo docker exec hive-server beeline -u "jdbc:hive2://localhost:10000" -e "SHOW PARTITIONS tourism_db.scenic_spots"
 echo.
 pause

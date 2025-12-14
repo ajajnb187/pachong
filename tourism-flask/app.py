@@ -10,8 +10,9 @@ from config import Config
 from models.database import SessionLocal, init_db
 from models.task import CrawlerTask
 from tasks.crawl_task import execute_crawl_task, execute_crawl_task_direct
-from tasks.crawl_task_v2 import execute_crawl_fuzhou_complete
+from tasks.crawl_task_v2 import execute_crawl_fuzhou_complete, stop_task
 from utils.logger import logger
+from services.traffic_forecast import traffic_service
 
 # 创建Flask应用
 app = Flask(__name__)
@@ -193,8 +194,8 @@ def get_task_list():
             'msg': f'查询失败: {str(e)}'
         }), 500
 
-@app.route('/api/crawler/stop', methods=['POST'])
-def stop_task():
+@app.route('/api/crawler/task/stop', methods=['POST'])
+def stop_task_api():
     """停止任务"""
     try:
         data = request.get_json()
@@ -223,21 +224,24 @@ def stop_task():
                     'msg': '任务未在运行中'
                 }), 400
             
-            # 更新任务状态
-            task.status = 'stopped'
-            task.end_time = datetime.now()
-            db.commit()
+            # 调用crawl_task_v2中的stop_task函数发送停止信号
+            success = stop_task(task_id)
             
-            logger.info(f"任务已停止: {task_id}")
-            
-            return jsonify({
-                'code': 200,
-                'msg': '任务已停止',
-                'data': {
-                    'task_id': task_id,
-                    'status': 'stopped'
-                }
-            })
+            if success:
+                logger.info(f"已向任务{task_id}发送停止信号")
+                return jsonify({
+                    'code': 200,
+                    'msg': '停止信号已发送，任务即将停止',
+                    'data': {
+                        'task_id': task_id,
+                        'status': 'stopping'
+                    }
+                })
+            else:
+                return jsonify({
+                    'code': 400,
+                    'msg': '任务不在运行状态，无法停止'
+                }), 400
             
         finally:
             db.close()
@@ -541,6 +545,81 @@ def get_system_status():
             'data': {
                 'service_status': 'error'
             }
+        }), 500
+
+@app.route('/api/analysis/traffic', methods=['POST'])
+def analyze_traffic():
+    """
+    人流量分析接口
+    接收历史评论数据，返回月度人流量统计和趋势分析
+    """
+    try:
+        data = request.get_json()
+        reviews_data = data.get('reviews', [])
+        
+        if not reviews_data:
+            return jsonify({
+                'code': 400,
+                'msg': '评论数据不能为空'
+            }), 400
+        
+        result = traffic_service.analyze_traffic(reviews_data)
+        
+        if result['success']:
+            return jsonify({
+                'code': 200,
+                'msg': '分析成功',
+                'data': result['data']
+            })
+        else:
+            return jsonify({
+                'code': 500,
+                'msg': result.get('message', '分析失败')
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"人流量分析失败: {str(e)}")
+        return jsonify({
+            'code': 500,
+            'msg': f'分析失败: {str(e)}'
+        }), 500
+
+@app.route('/api/forecast/traffic', methods=['POST'])
+def forecast_traffic():
+    """
+    人流量预测接口
+    基于ARIMA模型预测未来人流量
+    """
+    try:
+        data = request.get_json()
+        reviews_data = data.get('reviews', [])
+        months_ahead = int(data.get('months_ahead', 12))
+        
+        if not reviews_data:
+            return jsonify({
+                'code': 400,
+                'msg': '评论数据不能为空'
+            }), 400
+        
+        result = traffic_service.forecast_traffic(reviews_data, months_ahead)
+        
+        if result['success']:
+            return jsonify({
+                'code': 200,
+                'msg': '预测成功',
+                'data': result['data']
+            })
+        else:
+            return jsonify({
+                'code': 500,
+                'msg': result.get('message', '预测失败')
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"人流量预测失败: {str(e)}")
+        return jsonify({
+            'code': 500,
+            'msg': f'预测失败: {str(e)}'
         }), 500
 
 @app.errorhandler(404)

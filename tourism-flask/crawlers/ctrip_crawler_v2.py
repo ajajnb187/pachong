@@ -85,7 +85,7 @@ class CtripCrawlerV2:
         logger.info(f"景点数据爬取完成: 共 {len(all_spots)} 个景点")
         return all_spots
     
-    def crawl_reviews_for_spot(self, spot_id, spot_name, max_reviews=50):
+    def crawl_reviews_for_spot(self, spot_id, spot_name, max_reviews=50, stop_event=None):
         """
         爬取指定景点的用户评论 -> fuzhou_reviews表
         
@@ -93,6 +93,7 @@ class CtripCrawlerV2:
             spot_id: 景点ID
             spot_name: 景点名称
             max_reviews: 最多爬取评论数
+            stop_event: 停止信号Event对象
             
         Returns:
             list: 评论数据列表
@@ -105,6 +106,11 @@ class CtripCrawlerV2:
         max_pages = (max_reviews // page_size) + 1
         
         while len(reviews) < max_reviews and page <= max_pages:
+            # 检查停止信号
+            if stop_event and stop_event.is_set():
+                logger.warning(f"【{spot_name}】收到停止信号，中断爬取")
+                break
+            
             try:
                 # 调用评论API
                 page_reviews = self._fetch_reviews_page(spot_id, spot_name, page, page_size)
@@ -239,57 +245,64 @@ class CtripCrawlerV2:
     
     def _fetch_reviews_page(self, spot_id, spot_name, page, page_size):
         """获取某景点评论的某一页数据"""
-        payload = {
-            "arg": {
-                "businessType": 2,
-                "resourceId": int(spot_id),
-                "resourceType": 11,
-                "pageIndex": page,
-                "pageSize": page_size,
-                "sortType": 3,
-                "imageType": 0,
-                "starType": 0
-            },
-            "head": {
-                "userRegion": "CN",
-                "Version": "1.0"
+        try:
+            payload = {
+                "arg": {
+                    "businessType": 2,
+                    "resourceId": int(spot_id),
+                    "resourceType": 11,
+                    "pageIndex": page,
+                    "pageSize": page_size,
+                    "sortType": 3,
+                    "imageType": 0,
+                    "starType": 0
+                },
+                "head": {
+                    "userRegion": "CN",
+                    "Version": "1.0"
+                }
             }
-        }
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Content-Type': 'application/json',
-            'Referer': 'https://m.ctrip.com/'
-        }
-        
-        response = self.session.post(
-            self.comment_api,
-            json=payload,
-            headers=headers,
-            timeout=15
-        )
-        
-        if response.status_code != 200:
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Content-Type': 'application/json',
+                'Referer': 'https://m.ctrip.com/'
+            }
+            
+            response = self.session.post(
+                self.comment_api,
+                json=payload,
+                headers=headers,
+                timeout=15
+            )
+            
+            if response.status_code != 200:
+                return []
+            
+            data = response.json()
+            
+            if not data or 'result' not in data:
+                return []
+            
+            items = data.get('result', {}).get('items')
+            if items is None:
+                return []
+            
+            reviews = []
+            
+            for item in items:
+                try:
+                    review = self._parse_review(item, spot_name)
+                    if review:
+                        reviews.append(review)
+                except Exception as e:
+                    logger.debug(f"解析评论失败: {str(e)}")
+                    continue
+            
+            return reviews
+        except Exception as e:
+            logger.error(f"获取评论页面失败: {str(e)}")
             return []
-        
-        data = response.json()
-        
-        if not data or 'result' not in data:
-            return []
-        
-        items = data.get('result', {}).get('items', [])
-        reviews = []
-        
-        for item in items:
-            try:
-                review = self._parse_review(item, spot_name)
-                if review:
-                    reviews.append(review)
-            except Exception as e:
-                logger.debug(f"解析评论失败: {str(e)}")
-                continue
-        
-        return reviews
     
     def _parse_review(self, item, spot_name):
         """
@@ -315,6 +328,12 @@ class CtripCrawlerV2:
         # 用户信息
         user_info = item.get('userInfo', {})
         user_name = user_info.get('userNick', '携程用户')
+        user_location = user_info.get('userProvince', '')
+        
+        # 提取IP属地
+        ip_location = item.get('ipLocatedName', '')
+        if not ip_location:
+            ip_location = user_location  # 回退到用户省份
         
         # 评分
         rating = float(item.get('score', 5.0))
@@ -333,6 +352,8 @@ class CtripCrawlerV2:
             'review_content': content[:500],  # 限制长度
             'travel_date': travel_date,
             'review_date': review_date,
+            'visitor_location': user_location,
+            'ip_location': ip_location,
             'data_source': 'ctrip',
             'crawl_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }

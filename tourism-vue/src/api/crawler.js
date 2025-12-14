@@ -4,13 +4,13 @@ import { ElMessage } from 'element-plus'
 // 爬虫服务 - /api/crawler/* 路径
 const crawlerRequest = axios.create({
   baseURL: '/crawler',
-  timeout: 30000
+  timeout: 120000
 })
 
 // 爬虫服务 - /api/* 其他路径（datasource, scenic, admin, system）
 const flaskRequest = axios.create({
   baseURL: 'http://localhost:5000/api',
-  timeout: 30000
+  timeout: 120000
 })
 
 // 响应拦截器
@@ -60,8 +60,8 @@ export const getTaskListAPI = (params) => {
 
 // 停止任务
 export const stopTaskAPI = (data) => {
-  return crawlerRequest({
-    url: '/stop',
+  return flaskRequest({
+    url: '/crawler/task/stop',
     method: 'post',
     data
   })

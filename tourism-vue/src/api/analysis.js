@@ -78,3 +78,27 @@ export const getRecommendVisitTimeAPI = (params) => {
     params
   })
 }
+
+export const getTrafficAnalysisAPI = (params) => {
+  return request({
+    url: '/analysis/traffic-analysis',
+    method: 'GET',
+    params
+  })
+}
+
+export const getTrafficForecastAPI = (params) => {
+  return request({
+    url: '/analysis/traffic-forecast',
+    method: 'GET',
+    params
+  })
+}
+
+export const getRatingDistributionAPI = (spotId) => {
+  return request({
+    url: '/analysis/rating-distribution',
+    method: 'GET',
+    params: { spotId }
+  })
+}

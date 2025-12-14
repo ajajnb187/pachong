@@ -12,7 +12,7 @@ USE tourism_db;
 -- =====================================================
 -- 1. 用户表
 -- =====================================================
-CREATE TABLE IF NOT EXISTS `users` (
+CREATE TABLE IF NOT EXISTS `user` (
   `id` BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '用户ID',
   `username` VARCHAR(50) UNIQUE NOT NULL COMMENT '用户名',
   `password` VARCHAR(255) NOT NULL COMMENT '密码（BCrypt加密）',
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 -- 插入默认管理员账户
 -- 用户名：admin
 -- 密码：123456（BCrypt加密后）
-INSERT INTO `user` (`username`, `password`, `nickname`, `role`, `email`) 
+INSERT INTO `user` (`username`, `password`, `nickname`, `role`, `email`)
 VALUES ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '系统管理员', 'admin', 'admin@tourism.com')
 ON DUPLICATE KEY UPDATE `password` = VALUES(`password`);
 

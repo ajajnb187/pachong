@@ -39,6 +39,38 @@ services:
       - tourism-net
 
   # ==========================================
+  # YARN ResourceManager
+  # ==========================================
+  resourcemanager:
+    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
+    container_name: resourcemanager
+    restart: always
+    ports:
+      - "8088:8088"
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870 datanode:9864"
+    env_file:
+      - ./hadoop.env
+    networks:
+      - tourism-net
+
+  # ==========================================
+  # YARN NodeManager
+  # ==========================================
+  nodemanager:
+    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
+    container_name: nodemanager
+    restart: always
+    ports:
+      - "8042:8042"
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870 datanode:9864 resourcemanager:8088"
+    env_file:
+      - ./hadoop.env
+    networks:
+      - tourism-net
+
+  # ==========================================
   # PostgreSQL - Hive Metastore数据库
   # ==========================================
   hive-metastore-postgresql:
@@ -97,6 +129,7 @@ services:
     volumes:
       - ./init-hive-tables.sh:/opt/init-hive-tables.sh
       - ./init-hiveserver.sh:/opt/init-hiveserver.sh
+      - ./hive-init-partitioned.sql:/opt/hive-init-partitioned.sql
     depends_on:
       - hive-metastore
     command: /bin/bash /opt/init-hiveserver.sh

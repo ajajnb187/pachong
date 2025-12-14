@@ -29,17 +29,20 @@ class CrawlerTask(Base):
     def to_dict(self):
         """转换为字典"""
         return {
+            'id': self.id,
             'task_id': self.id,
             'task_name': self.task_name,
             'scenic_spot_name': self.scenic_spot_name,
             'data_source': self.data_source,
             'target_count': self.target_count,
             'actual_count': self.actual_count,
+            'crawled_count': self.actual_count,
             'status': self.status,
             'progress': self.progress,
             'start_time': self.start_time.strftime('%Y-%m-%d %H:%M:%S') if self.start_time else None,
             'end_time': self.end_time.strftime('%Y-%m-%d %H:%M:%S') if self.end_time else None,
             'error_msg': self.error_msg,
             'hdfs_path': self.hdfs_path,
+            'output_file': self.hdfs_path,
             'create_time': self.create_time.strftime('%Y-%m-%d %H:%M:%S') if self.create_time else None
         }

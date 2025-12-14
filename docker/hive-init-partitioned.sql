@@ -17,8 +17,7 @@ USE tourism_db;
 -- - 查询时默认使用最新分区视图 scenic_spots_latest
 -- ==========================================
 
-DROP TABLE IF EXISTS scenic_spots;
-CREATE EXTERNAL TABLE scenic_spots (
+CREATE EXTERNAL TABLE IF NOT EXISTS scenic_spots (
     business_id INT COMMENT '景点业务ID',
     scenic_spot STRING COMMENT '景点名称',
     city STRING COMMENT '城市',
@@ -53,8 +52,7 @@ TBLPROPERTIES ('skip.header.line.count'='0');
 -- - 分析时可以跨分区聚合，也可以只看最新批次
 -- ==========================================
 
-DROP TABLE IF EXISTS fuzhou_reviews;
-CREATE EXTERNAL TABLE fuzhou_reviews (
+CREATE EXTERNAL TABLE IF NOT EXISTS fuzhou_reviews (
     scenic_spot STRING COMMENT '景区名称',
     city STRING COMMENT '城市',
     rating DOUBLE COMMENT '评分(1-5)',
@@ -62,6 +60,8 @@ CREATE EXTERNAL TABLE fuzhou_reviews (
     review_content STRING COMMENT '评论内容',
     travel_date STRING COMMENT '旅游日期YYYY-MM-DD',
     review_date STRING COMMENT '评论日期YYYY-MM-DD',
+    visitor_location STRING COMMENT '游客省份',
+    ip_location STRING COMMENT 'IP属地（用于客源地统计）',
     data_source STRING COMMENT '数据来源',
     crawl_time STRING COMMENT '爬取时间'
 )

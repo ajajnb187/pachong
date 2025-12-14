@@ -94,4 +94,22 @@ public interface IScenicAnalysisService {
      * 获取建议游玩时间
      */
     Map<String, Object> getRecommendVisitTime(String spotId);
+    
+    /**
+     * 获取人流量分析
+     * 基于历史评论数据分析月度人流量趋势
+     */
+    Map<String, Object> getTrafficAnalysis(String spotId, Integer year);
+    
+    /**
+     * 获取人流量预测
+     * 基于ARIMA模型预测未来人流量
+     */
+    Map<String, Object> getTrafficForecast(String spotId, Integer monthsAhead);
+    
+    /**
+     * 获取评分分布统计
+     * 基于实际Hive数据统计各星级评分占比
+     */
+    Map<String, Object> getRatingDistribution(String spotId);
 }

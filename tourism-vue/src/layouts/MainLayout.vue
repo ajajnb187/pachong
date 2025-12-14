@@ -22,7 +22,7 @@
           </div>
           <transition name="fade-slide">
             <div v-if="!isCollapse" class="logo-text">
-              <span class="main-title">榕城智旅云图</span>
+              <span class="main-title">福州智旅云图</span>
               <span class="sub-title">FUZHOU TOURISM BRAIN</span>
             </div>
           </transition>
@@ -94,7 +94,6 @@
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item command="profile"><el-icon><User /></el-icon> 账号信息</el-dropdown-item>
-                    <el-dropdown-item command="setting"><el-icon><Setting /></el-icon> 系统设置</el-dropdown-item>
                     <el-dropdown-item command="logout" divided><el-icon><SwitchButton /></el-icon> 安全退出</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
@@ -134,8 +133,8 @@ const isCollapse = ref(false)
 const currentTime = ref('')
 const currentDate = ref('')
 
-// 设置一个固定的、友好的、科技感的默认头像 (这里使用 Notion 风格或 3D 风格头像)
-const defaultAvatar = ref('https://notion-avatar.vercel.app/api/svg/eyJmYWNlIjo2LCJub3NlIjo1LCJtb3V0aCI6OSwiZXllcyI6MCwiZXllYnJvd3MiOjYsImdsYXNzZXMiOjAsImhhaXIiOjMxLCJhY2Nlc3NvcmllcyI6MCwiZGV0YWlscyI6MCwiYmVhcmQiOjAsImZsaXAiOjAsImNvbG9yIjoicmNvYSIsInNoYXBlIjoibm9uZSJ9')
+// 使用本地头像，避免外部URL加载失败
+const defaultAvatar = ref('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Ccircle cx="50" cy="50" r="50" fill="%2300f2fe"/%3E%3Ctext x="50" y="65" font-size="48" text-anchor="middle" fill="white" font-weight="bold"%3E管%3C/text%3E%3C/svg%3E')
 
 // 菜单路由逻辑 (排除 Login)
 const menuRoutes = computed(() => {
@@ -175,7 +174,9 @@ onUnmounted(() => {
 })
 
 const handleCommand = (command) => {
-  if (command === 'logout') {
+  if (command === 'profile') {
+    router.push('/profile')
+  } else if (command === 'logout') {
     ElMessageBox.confirm('即将断开与福州旅游数据中心的连接，是否确认？', '系统警告', {
       confirmButtonText: '立即断开',
       cancelButtonText: '取消',

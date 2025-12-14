@@ -1,26 +1,25 @@
 #!/bin/bash
 set -e
 
-echo "等待依赖服务启动..."
+echo "Waiting for dependent services to start..."
 sleep 10
 
-echo "检查Hive Metastore Schema状态..."
-# 设置PostgreSQL连接信息（schematool需要这些环境变量）
+echo "Checking Hive Metastore Schema status..."
 export HIVE_CONF_DIR=/opt/hive/conf
 
 if /opt/hive/bin/schematool -dbType postgres -info 2>&1 | grep -q "Metastore connection URL"; then
     if /opt/hive/bin/schematool -dbType postgres -info 2>&1 | grep -q "schemaTool completed"; then
-        echo "Schema已存在，跳过初始化"
+        echo "Schema already exists, skipping initialization"
     else
-        echo "Schema不存在或损坏，开始初始化..."
+        echo "Schema does not exist or is corrupted, starting initialization..."
         /opt/hive/bin/schematool -dbType postgres -initSchema || true
-        echo "Schema初始化完成"
+        echo "Schema initialization completed"
     fi
 else
-    echo "Schema不存在，开始初始化..."
+    echo "Schema does not exist, starting initialization..."
     /opt/hive/bin/schematool -dbType postgres -initSchema || true
-    echo "Schema初始化完成"
+    echo "Schema initialization completed"
 fi
 
-echo "启动Metastore服务..."
+echo "Starting Metastore service..."
 /opt/hive/bin/hive --service metastore

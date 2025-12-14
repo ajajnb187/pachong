@@ -1,20 +1,17 @@
 #!/bin/bash
 set -e
 
-echo "等待Hive Metastore服务启动..."
+echo "Waiting for Hive Metastore service to start..."
 sleep 30
 
-echo "启动HiveServer2..."
+echo "Starting HiveServer2..."
 /opt/hive/bin/hive --service hiveserver2 &
 
-echo "等待HiveServer2启动..."
+echo "Waiting for HiveServer2 to start..."
 sleep 60
 
-echo "初始化Hive基础表..."
-/opt/hive/bin/beeline -u jdbc:hive2://localhost:10000 -f /opt/init-hive-tables.sh || echo "表初始化失败或已存在"
+echo "Initializing Hive tables and views..."
+/opt/hive/bin/beeline -u jdbc:hive2://localhost:10000 -f /opt/hive-init-partitioned.sql || echo "Table/View initialization failed or already exists"
 
-echo "创建VIEW视图和分区..."
-/opt/hive/bin/beeline -u jdbc:hive2://localhost:10000 -f /opt/hive-init-partitioned.sql || echo "VIEW创建失败或已存在"
-
-echo "HiveServer2启动完成，保持运行..."
+echo "HiveServer2 started successfully, keeping container running..."
 tail -f /dev/null
